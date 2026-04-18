@@ -17,7 +17,26 @@ Offline metrics: [`src/evaluation/`](src/evaluation/) and `python -m src.evaluat
 - Python 3.10+
 - Network for dataset download and (if used) OpenAI calls
 
+### Virtual environment (recommended)
+
+Create and activate a venv **from the repository root** so `pip` and `python` install into that environment (not the system Python).
+
+```bash
+cd /path/to/mail-chimp-code
+python3 -m venv .venv
+source .venv/bin/activate
+```
+
+You should see `(.venv)` in your shell prompt. If the folder were named `venv` instead, use `source venv/bin/activate` (same pattern).
+
+**Windows (Command Prompt):** `.\.venv\Scripts\activate.bat`  
+**Windows (PowerShell):** `.\.venv\Scripts\Activate.ps1`
+
+Deactivate later with `deactivate`.
+
 ### Install
+
+With the venv **activated**:
 
 ```bash
 pip install -r requirements.txt
@@ -31,7 +50,7 @@ python -m spacy download en_core_web_sm
 
 ### Run
 
-From the repository root:
+From the repository root, with the venv activated (`source .venv/bin/activate`):
 
 ```bash
 python main.py
