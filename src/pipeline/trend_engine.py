@@ -96,12 +96,5 @@ class TrendPipelineEngine:
             llm_top_n=llm_top_n,
         )
 
-    def score_topics(self, videos_df: pd.DataFrame) -> pd.DataFrame:
-        """One-shot: aggregates → ranking log → keywords → marketer fields."""
-        topic_insights = self.score_topic_aggregates(videos_df)
-        self.log_topic_ranking_evaluation(topic_insights)
-        topic_insights = self.attach_topic_keywords(topic_insights)
-        return self.enrich_marketer_insights(videos_df, topic_insights)
-
     def run(self) -> tuple[pd.DataFrame, pd.DataFrame]:
         return run_trend_pipeline(self)

@@ -82,7 +82,7 @@ The text-prep checkpoint (`videos_text_before_topics.csv`) is written after spaC
 
 Execution order matches `TrendPipelineEngine` ([`src/pipeline/trend_engine.py`](../src/pipeline/trend_engine.py)). A worked example is in [ml_guide.md](ml_guide.md).
 
-`DEFAULT_TREND_PIPELINE_STEPS` ([`pipeline_run.py`](../src/pipeline/pipeline_run.py)) prints **ten** console titles (Steps 1–10). Steps 6–9 map to `TrendPipelineEngine` methods: `score_topic_aggregates` → `log_topic_ranking_evaluation` → `attach_topic_keywords` → `enrich_marketer_insights`. `score_topics()` on the engine still chains those four for callers that want one call.
+`DEFAULT_TREND_PIPELINE_STEPS` ([`pipeline_run.py`](../src/pipeline/pipeline_run.py)) prints **ten** console titles (Steps 1–10). Steps 6–9 map to `TrendPipelineEngine` methods: `score_topic_aggregates` → `log_topic_ranking_evaluation` → `attach_topic_keywords` → `enrich_marketer_insights`. Entry point `main.py` uses `TrendPipelineEngine.run()` → `run_trend_pipeline` with this full sequence.
 
 | # | Stage (console label) | Columns / artifacts | Implementation |
 |---|--------|----------------------|----------------|
