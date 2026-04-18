@@ -22,7 +22,7 @@ Offline metrics: [`src/evaluation/`](src/evaluation/) and `python -m src.evaluat
 Create and activate a venv **from the repository root** so `pip` and `python` install into that environment (not the system Python).
 
 ```bash
-cd /path/to/mail-chimp-code
+cd /path/to/Mailchimp-Email-Marketing
 python3 -m venv .venv
 source .venv/bin/activate
 ```
