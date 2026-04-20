@@ -45,17 +45,26 @@ def collect_trend_dashboard_filters(topic_insights: pd.DataFrame) -> TrendDashbo
         index=1,
     )
 
-    clarity = st.sidebar.selectbox("Clarity", CLARITY_OPTIONS)
-
-    show_all_topics_including_non_llm = st.sidebar.checkbox(
-        "Include topics outside LLM top-N",
-        value=True,
+    clarity = st.sidebar.selectbox(
+        "Clarity",
+        CLARITY_OPTIONS,
         help=(
-            "When on (default), lists every topic in the export; beyond the first llm_top_n "
-            "ranked topics, summaries show a placeholder (no LLM call). When off, only topics "
-            "with full LLM summaries are listed (typically llm_top_n rows). Use pagination under Trends."
+            "Whether the video cluster looks coherent or mixed/noisy. This is separate from "
+            "whether the LLM wrote the summary (see LLM summaries below)."
         ),
     )
+
+    llm_summaries_mode = st.sidebar.radio(
+        "LLM summaries",
+        options=("All topics in export", "Full LLM only (top-N)"),
+        index=0,
+        help=(
+            "All topics: include rows where the summary is a placeholder because the topic ranked "
+            "below llm_top_n (no model call). Full LLM only: hide those—typically the rows that "
+            "received summaries and campaign copy. Use pagination under Trends to browse the list."
+        ),
+    )
+    show_all_topics_including_non_llm = llm_summaries_mode == "All topics in export"
 
     sort_label = st.sidebar.selectbox(
         "Sort By",

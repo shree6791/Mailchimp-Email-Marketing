@@ -6,15 +6,85 @@ import altair as alt
 import pandas as pd
 import streamlit as st
 
-from src.constants.dashboard import TREND_TYPE_BADGE_COLORS
 from src.constants.insights import OUTSIDE_LLM_TOP_N_SUMMARY
-from src.constants.mailchimp_ui import (
-    MAILCHIMP_CANVAS,
-    MAILCHIMP_SURFACE,
-    MAILCHIMP_WHITE,
-    MAILCHIMP_YELLOW,
-)
-from src.serving.streamlit.formatting import compact_number, pill, pretty_trend_type
+from src.constants.mailchimp_ui import MAILCHIMP_WHITE, MAILCHIMP_YELLOW
+from src.serving.streamlit.formatting import compact_number, pretty_trend_type
+
+
+def _normalize_campaign_copy(raw: object) -> dict[str, str]:
+    if not isinstance(raw, dict):
+        return {}
+    out: dict[str, str] = {}
+    for key in ("campaign_angle", "suggested_subject", "email_hook"):
+        v = raw.get(key, "")
+        out[key] = str(v) if v is not None else ""
+    return out
+
+
+def _key_phrases_for_details(row: pd.Series) -> str | None:
+    """
+    Single display line from ``topic_label`` and ``dominant_topic_keywords``.
+
+    Merges when:
+    - same wording (after normalizing commas/space); or
+    - one's token set is a subset of the other's; or
+    - high token overlap (Jaccard) so we do not repeat shared words in ``a · b``.
+    """
+    tl = str(row.get("topic_label") or "").strip()
+    dk_raw = row.get("dominant_topic_keywords")
+    dk_s = ""
+    if isinstance(dk_raw, list) and dk_raw:
+        dk_s = ", ".join(str(x).strip() for x in dk_raw if str(x).strip())
+
+    def norm(s: str) -> str:
+        return " ".join(s.lower().replace(",", " ").split())
+
+    def tokens(s: str) -> set[str]:
+        return {w for w in norm(s).split() if w}
+
+    if tl and dk_s:
+        nt, nd = norm(tl), norm(dk_s)
+        if nt == nd:
+            return dk_s if len(dk_s) >= len(tl) else tl
+
+        tset, dset = tokens(tl), tokens(dk_s)
+        if not tset and not dset:
+            pass
+        elif not tset:
+            return dk_s
+        elif not dset:
+            return tl
+        elif tset <= dset or dset <= tset:
+            return dk_s if len(dk_s) >= len(tl) else tl
+        else:
+            uni = tset | dset
+            inter = tset & dset
+            jaccard = len(inter) / len(uni) if uni else 0.0
+            # Strong overlap but neither is a subset (e.g. each adds one token) → one merged list.
+            if jaccard >= 0.55:
+                return ", ".join(sorted(uni))
+
+        return f"{tl} · {dk_s}"
+
+    return tl or dk_s or None
+
+
+def _has_surface_campaign_copy(row: pd.Series, campaign: dict[str, str]) -> bool:
+    """Full LLM row with marketing copy blocks (for main card, not placeholder summaries)."""
+    if row.get("marketing_safe") is not True:
+        return False
+    if str(row.get("summary", "")).strip() == OUTSIDE_LLM_TOP_N_SUMMARY:
+        return False
+    return bool((campaign.get("campaign_angle") or "").strip() or (campaign.get("email_hook") or "").strip())
+
+
+def _is_featured(row: pd.Series, campaign: dict[str, str]) -> bool:
+    """Rows with real LLM summaries and campaign copy (inside top-N), marketing-safe."""
+    if str(row.get("summary", "")).strip() == OUTSIDE_LLM_TOP_N_SUMMARY:
+        return False
+    if row.get("marketing_safe") is not True:
+        return False
+    return bool((campaign.get("suggested_subject") or "").strip())
 
 
 def _campaign_unavailable_reason(row: pd.Series) -> str:
@@ -33,37 +103,7 @@ def _campaign_unavailable_reason(row: pd.Series) -> str:
     return "Campaign copy unavailable for this trend."
 
 
-def render_badges(row: pd.Series) -> None:
-    trend_type = row.get("trend_type", "general")
-    fragmented = bool(row.get("fragmented_trend", False))
-    marketing_safe = row.get("marketing_safe", None)
-
-    bg, fg = TREND_TYPE_BADGE_COLORS.get(trend_type, ("#E5E7EB", "#374151"))
-
-    badges = [
-        pill(pretty_trend_type(trend_type), bg, fg),
-        pill("Mixed / Noisy", MAILCHIMP_SURFACE, MAILCHIMP_WHITE, border=MAILCHIMP_YELLOW)
-        if fragmented
-        else pill("Clear", MAILCHIMP_SURFACE, MAILCHIMP_WHITE, border=MAILCHIMP_WHITE),
-        pill("Campaign Ready", MAILCHIMP_YELLOW, MAILCHIMP_CANVAS)
-        if marketing_safe is True
-        else pill("No Campaign", MAILCHIMP_SURFACE, "#A8A29E"),
-    ]
-
-    html = "".join(badges)
-
-    st.markdown(
-        f"""
-<div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin:0.35rem 0 0.8rem 0;">
-    {html}
-</div>
-""",
-        unsafe_allow_html=True,
-    )
-
-
 def render_statline(row: pd.Series) -> None:
-    score = f"{row.get('trend_score', 0):.2f}"
     views = compact_number(row.get("avg_views", 0))
     likes = compact_number(row.get("avg_likes", 0))
     momentum = float(row.get("momentum", 0))
@@ -73,7 +113,6 @@ def render_statline(row: pd.Series) -> None:
     text = (
         f"<span style='color:{MAILCHIMP_WHITE};'>"
         f"<strong style='color:{MAILCHIMP_YELLOW};'>Opportunity</strong> {opportunity}  ·  "
-        f"<strong style='color:{MAILCHIMP_YELLOW};'>Trend Strength</strong> {score}  ·  "
         f"<strong style='color:{MAILCHIMP_YELLOW};'>Views</strong> {views}  ·  "
         f"<strong style='color:{MAILCHIMP_YELLOW};'>Likes</strong> {likes}  ·  "
         f"<strong style='color:{MAILCHIMP_YELLOW};'>Growth</strong> {momentum_prefix}{momentum:.2f}"
@@ -83,51 +122,66 @@ def render_statline(row: pd.Series) -> None:
 
 
 def render_trend_card(row: pd.Series) -> None:
-    topic_name = row.get("topic_display_name", "Unnamed Trend")
+    campaign = _normalize_campaign_copy(row.get("campaign_copy"))
+    featured = _is_featured(row, campaign)
+    topic_name = str(row.get("topic_display_name") or "Unnamed Trend").strip() or "Unnamed Trend"
+    subject = (campaign.get("suggested_subject") or "").strip()
+    use_subject_headline = bool(
+        subject and row.get("marketing_safe") is True and str(row.get("summary", "")).strip() != OUTSIDE_LLM_TOP_N_SUMMARY
+    )
+    headline = subject if use_subject_headline else topic_name
+
     summary = row.get("summary", "")
-    suggestion = row.get("campaign_copy", {})
-    if not isinstance(suggestion, dict):
-        suggestion = {}
 
     with st.container(border=True):
-        st.markdown(f"### {topic_name}")
-        render_badges(row)
+        if featured:
+            head_l, head_r = st.columns([11, 1])
+            with head_l:
+                st.markdown(f"### {headline}")
+            with head_r:
+                st.markdown(
+                    '<p title="Full LLM summary and campaign copy for this trend." '
+                    'style="text-align:right;font-size:1.35rem;margin:0.1rem 0 0 0;'
+                    "padding:0;line-height:1.25;\">🔥</p>",
+                    unsafe_allow_html=True,
+                )
+        else:
+            st.markdown(f"### {headline}")
+
         render_statline(row)
 
-        st.write(summary)
+        surface_campaign = _has_surface_campaign_copy(row, campaign)
+        # Narrative summary overlaps angle/hook for marketer-facing rows; keep CSV for full text.
+        if not surface_campaign:
+            st.write(summary)
 
-        if row.get("marketing_safe", False) and suggestion.get("suggested_subject"):
-            st.markdown(
-                f"**Suggested Subject:** {suggestion.get('suggested_subject', '')}"
-            )
-        else:
-            st.caption(_campaign_unavailable_reason(row))
+        if surface_campaign:
+            angle = (campaign.get("campaign_angle") or "").strip()
+            hook = (campaign.get("email_hook") or "").strip()
+            if angle:
+                st.markdown("**Campaign angle**")
+                st.write(angle)
+            if hook:
+                st.markdown("**Email hook**")
+                st.write(hook)
 
-        with st.expander("Details"):
-            topic_label = row.get("topic_label", "")
-            if topic_label:
-                st.markdown(f"**Keywords:** {topic_label}")
-
-            dominant_keywords = row.get("dominant_topic_keywords")
-            if dominant_keywords:
-                st.markdown(
-                    f"**Dominant Keywords:** {', '.join(dominant_keywords)}"
-                )
-
-            sample_titles = row.get("sample_titles")
-            if sample_titles:
-                st.markdown("**Sample Titles**")
-                for title in sample_titles:
-                    st.write(f"- {title}")
-
-            if row.get("marketing_safe", False) and suggestion:
-                st.markdown("**Campaign Angle**")
-                st.write(suggestion.get("campaign_angle", ""))
-
-                st.markdown("**Email Hook**")
-                st.write(suggestion.get("email_hook", ""))
-            else:
+        if not use_subject_headline and row.get("marketing_safe", False) and subject:
+            st.markdown(f"**Suggested Subject:** {subject}")
+        elif not use_subject_headline:
+            # Placeholder summary already says LLM was skipped; avoid duplicating below.
+            if str(summary).strip() != OUTSIDE_LLM_TOP_N_SUMMARY:
                 st.caption(_campaign_unavailable_reason(row))
+
+        kp = _key_phrases_for_details(row)
+        sample_titles = row.get("sample_titles")
+        if kp or sample_titles:
+            with st.expander("Additional context"):
+                if kp:
+                    st.markdown(f"**Key phrases:** {kp}")
+                if sample_titles:
+                    st.markdown("**Sample titles**")
+                    for title in sample_titles:
+                        st.write(f"- {title}")
 
 
 def render_top_metrics(topic_insights: pd.DataFrame, filtered: pd.DataFrame) -> None:
