@@ -74,13 +74,13 @@ Four rows share a meal preparation theme. `Day` labels two distinct trending dat
 
 #### 2.1 Scoring for topic 2 (illustrative)
 
-Scoring now happens on **topic-segment rows**, not only a single topic aggregate.
+Scoring now happens on **topic-segment rows**, not only one topic-level aggregate.
 
 - **Topic-segment expansion** — topic 2 can appear in one or more segments in a run (for example, `technology` on one day and `general` on another), based on video-level segment assignment.
-- **Per-row features** — each topic-segment row uses volume/doc_count, momentum, engagement, proxy CTR with recency, and freshness-style signals.
-- **Query grouping for LambdaMART** — training rows are grouped by (`date`, `ranking_segment`), then topics compete only inside that query.
-- **Label construction** — relevance is built from blended in-query gain (`0.7 * ctr_recency_norm + 0.3 * momentum_norm`), then bucketed into integer `label_relevance` (0–4).
-- **Final score** — the pipeline blends learned LambdaMART score with anchor score (`lambdamart_blend_alpha` in `Settings`) into final `trend_score`, then applies segment-aware global merge ordering for output.
+- **Per-row signals** — each topic-segment row includes size, momentum, engagement, and recency-aware CTR signals.
+- **Grouped ranking** — LambdaMART compares rows inside date+segment groups, so similar rows compete with each other.
+- **Relevance labels** — each row gets a simple bucketed relevance score (0–4) from blended engagement/momentum gain within its group.
+- **Final score** — `trend_score` combines the model score with stable anchor signals, then the output is merged into one display-friendly ranked list.
 
 #### 2.2 Marketer-facing fields (illustrative)
 
@@ -92,7 +92,7 @@ Scoring now happens on **topic-segment rows**, not only a single topic aggregate
 
 #### 2.3 Offline ranking evaluation (no human labels)
 
-Without editorial judgments, the pipeline surfaces proxy NDCG@N: it compares `trend_score` ordering to an ideal ordering by blended proxy gain on the same top-N ranked rows used for LLM calls. In the current flow those rows are topic-segment ranking rows. Blended gain is `0.5*ctr_recency_norm + 0.3*volume_norm + 0.2*momentum_norm`, where `ctr_recency_norm` comes from `avg_proxy_ctr_recency`. This metric is part of the standard run and supports engineering review; it is not a substitute for A/B tests or human evaluation. Set `log_ranking_evaluation=False` on `Settings` only to skip the block (for example in automation). Recompute from a saved CSV: `python -m src.evaluation outputs/topic_insights.csv`.
+Without editorial judgments, the pipeline surfaces proxy NDCG@N: it compares `trend_score` ordering to an ideal ordering by blended proxy gain on the same top-N ranked rows used for LLM calls. In the current flow those rows are topic-segment ranking rows. This metric is part of the standard run and supports engineering review; it is not a substitute for A/B tests or human evaluation. Set `log_ranking_evaluation=False` on `Settings` only to skip the block (for example in automation). Recompute from a saved CSV: `python -m src.evaluation outputs/topic_insights.csv`.
 
 ---
 
