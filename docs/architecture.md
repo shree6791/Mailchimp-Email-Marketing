@@ -99,7 +99,7 @@ Execution order matches `TrendPipelineEngine` ([`src/pipeline/trend_engine.py`](
 
 Replay Step 7 metrics from CSV: `python -m src.evaluation outputs/topic_insights.csv`.
 
-Scoring (stage 6): topic-level proxy features (volume, momentum, engagement, proxy CTR, freshness) are blended with a non-personalized LambdaMART score. Segment assignment is applied at video-row level, then LambdaMART training rows are built as (`date`, `ranking_segment`, `topic`) with segment-local blended labels (`0.7*ctr_recency + 0.3*momentum`) and pairwise ordering inside each (`date`, `ranking_segment`) query. Final `trend_score` is a stability blend (`lambdamart_blend_alpha`) of learned and anchor signals; LambdaMART is required (no anchor-only fallback mode).
+Scoring (stage 6): topic-level proxy features (volume, momentum, engagement, proxy CTR, freshness) are blended with a non-personalized LambdaMART score. Segment assignment is applied at video-row level, then LambdaMART training rows are built as (`date`, `ranking_segment`, `topic`) with segment-local blended labels (`0.7*ctr_recency + 0.3*momentum`) and pairwise ordering inside each (`date`, `ranking_segment`) query. During inference, the model predicts on latest-date aggregated (`ranking_segment`, `topic`) rows directly (no pair construction at inference time). Final `trend_score` is a stability blend (`lambdamart_blend_alpha`) of learned and anchor signals; LambdaMART is required (no anchor-only fallback mode).
 
 Topic identifiers: `topic` integers are run-scoped, not stable across runs.
 
