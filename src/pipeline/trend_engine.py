@@ -2,16 +2,18 @@ import numpy as np
 import pandas as pd
 
 from src.config.settings import Settings
-from src.ingestion import TrendingDatasetLoader
+from src.ingestion.trending_dataset_loader import TrendingDatasetLoader
 from src.insights.insight_generator import InsightGenerator
-from src.ml.embeddings import EmbeddingService
-from src.ml.nlp import SpacyPreprocessor, TopicModeler, TopicNamer
+from src.ml.embeddings.embedding_service import EmbeddingService
+from src.ml.nlp.spacy_preprocessor import SpacyPreprocessor
+from src.ml.nlp.topic_modeler import TopicModeler
+from src.ml.nlp.topic_namer import TopicNamer
 from src.evaluation.reporting import log_ranking_evaluation
-from src.ml.trends import (
-    TrendScorer,
+from src.ml.trends.topic_insight_enrichment import (
     add_topic_keyword_columns,
     enrich_topic_insights_marketer_fields,
 )
+from src.ml.trends.trend_scorer import TrendScorer
 from src.pipeline.pipeline_run import run_trend_pipeline
 from src.utils.text_utils import build_document
 
@@ -63,7 +65,7 @@ class TrendPipelineEngine:
 
     def score_topic_aggregates(self, videos_df: pd.DataFrame) -> pd.DataFrame:
         """Per-topic aggregates from ``TrendScorer`` (no keywords or LLM)."""
-        topic_insights = self.trend_scorer.score(videos_df)
+        topic_insights = self.trend_scorer.score(videos_df, self.topic_modeler)
         if topic_insights.empty:
             raise RuntimeError(
                 "Topic scoring produced no results. Check input data or date parsing."

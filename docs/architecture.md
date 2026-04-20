@@ -91,7 +91,7 @@ Execution order matches `TrendPipelineEngine` ([`src/pipeline/trend_engine.py`](
 | 3 | Step 3: spaCy normalization | Adds `cleaned_text` | `enrich_documents` → `SpacyPreprocessor.transform` |
 | 4 | Step 4: Save text-prep checkpoint | `videos_text_before_topics.csv` | `save_text_prep_checkpoint` |
 | 5 | Step 5: Embeddings + topic assignment | Adds `topic`, `topic_confidence` | `EmbeddingService.encode`, `TopicModeler.fit_transform` |
-| 6 | Step 6: Trend scoring | Per-topic aggregates; excludes `topic == -1` | `score_topic_aggregates` → [`TrendScorer.score`](../src/ml/trends/trend_scorer.py) |
+| 6 | Step 6: Trend scoring | Per-topic aggregates expanded to topic-segment ranking rows; excludes `topic == -1` | `score_topic_aggregates` → [`TrendScorer.score`](../src/ml/trends/trend_scorer.py) |
 | 7 | Step 7: Offline ranking evaluation | Console metrics (proxy NDCG; uses blended gain vs `trend_score`) | `log_topic_ranking_evaluation` → [`log_ranking_evaluation`](../src/evaluation/reporting.py) |
 | 8 | Step 8: Attach topic keywords | `topic_keywords`, `topic_label`, … | `attach_topic_keywords` → [`add_topic_keyword_columns`](../src/ml/trends/topic_insight_enrichment.py) |
 | 9 | Step 9: Marketer insights | `summary`, `campaign_copy`, … | `enrich_marketer_insights` → [`enrich_topic_insights_marketer_fields`](../src/ml/trends/topic_insight_enrichment.py) |
@@ -99,7 +99,7 @@ Execution order matches `TrendPipelineEngine` ([`src/pipeline/trend_engine.py`](
 
 Replay Step 7 metrics from CSV: `python -m src.evaluation outputs/topic_insights.csv`.
 
-Scoring (stage 6): topic-level proxy features (volume, momentum, engagement, proxy CTR, freshness) are blended with a non-personalized LambdaMART score. Training uses date-grouped pseudo-relevance from next-day topic lift; final `trend_score` is a stability blend (`lambdamart_blend_alpha`) of learned and anchor signals, with anchor-only fallback when learned ranking is unavailable or under-supported.
+Scoring (stage 6): topic-level proxy features (volume, momentum, engagement, proxy CTR, freshness) are blended with a non-personalized LambdaMART score. Segment assignment is applied at video-row level, then LambdaMART training rows are built as (`date`, `ranking_segment`, `topic`) with segment-local blended labels (`0.7*ctr_recency + 0.3*momentum`) and pairwise ordering inside each (`date`, `ranking_segment`) query. Final `trend_score` is a stability blend (`lambdamart_blend_alpha`) of learned and anchor signals; LambdaMART is required (no anchor-only fallback mode).
 
 Topic identifiers: `topic` integers are run-scoped, not stable across runs.
 
@@ -134,11 +134,11 @@ flowchart TB
 | `data/raw/` | Region CSV (default `USvideos.csv`) | Raw Kaggle export after download. |
 | `data/processed/` | `videos_text_before_topics.csv` | Input metrics plus `document` and `cleaned_text` prior to topic assignment. |
 | `outputs/` | `videos_with_topics.csv` | Per-video metrics with `topic` and `topic_confidence`. |
-| `outputs/` | `topic_insights.csv` | One row per scored topic: metrics, keywords, LLM fields, nested `campaign_copy`. |
+| `outputs/` | `topic_insights.csv` | One row per scored topic-segment entry: metrics, segment fields, keywords, LLM fields, nested `campaign_copy`. |
 
 #### 6.2 Join semantics
 
-Within one pipeline run and working directory, `videos_with_topics.topic` matches `topic_insights.topic` for the same logical cluster.
+Within one pipeline run and working directory, `videos_with_topics.topic` maps to one or more `topic_insights` rows via (`topic`, `ranking_segment`) pairs for the same logical cluster.
 
 #### 6.3 Validation and versioning
 

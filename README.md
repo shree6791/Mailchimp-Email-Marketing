@@ -1,6 +1,6 @@
 ## Mailchimp Trend Engine
 
-End-to-end **batch pipeline** plus a **Streamlit** dashboard. It loads public YouTube trending data, clusters videos with BERTopic, ranks topics with a stability-tuned **LambdaMART + anchor-score blend** (with fallback to anchor-only scoring when needed), optionally logs **proxy NDCG** (no human labels), then—when configured—calls OpenAI on the top `llm_top_n` topics only when coherence and marketing-safety checks pass.
+End-to-end **batch pipeline** plus a **Streamlit** dashboard. It loads public YouTube trending data, clusters videos with BERTopic, ranks topic-segment rows with a stability-tuned **LambdaMART + anchor-score blend** (LambdaMART is required; no anchor-only fallback mode), optionally logs **proxy NDCG** (no human labels), then—when configured—calls OpenAI on the top `llm_top_n` rows only when coherence and marketing-safety checks pass.
 
 This repo does **not** connect to Mailchimp or other ESP APIs; it writes local CSVs and serves a local UI.
 

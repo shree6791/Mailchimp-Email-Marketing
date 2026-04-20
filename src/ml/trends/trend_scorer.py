@@ -1,15 +1,12 @@
 import re
 
+from lightgbm import LGBMRanker
 import numpy as np
 import pandas as pd
 
 from src.config.settings import Settings
+from src.ml.trends.trend_taxonomy import classify_trend_type
 from src.utils.text_utils import safe_text
-
-try:
-    from lightgbm import LGBMRanker  # type: ignore[reportMissingImports]
-except ImportError:  # pragma: no cover - optional dependency
-    LGBMRanker = None
 
 
 class TrendScorer:
@@ -116,6 +113,38 @@ class TrendScorer:
         topic_stats["freshness"] = 1.0 / (1.0 + topic_stats["avg_age_hours"].clip(lower=0))
         return topic_stats, latest_date
 
+    @staticmethod
+    def _minmax_by_group(
+        frame: pd.DataFrame, value_col: str, group_cols: list[str]
+    ) -> pd.Series:
+        grouped = frame.groupby(group_cols)[value_col]
+        mins = grouped.transform("min")
+        maxs = grouped.transform("max")
+        denom = (maxs - mins).replace(0, np.nan)
+        out = (frame[value_col] - mins) / (denom + 1e-12)
+        return out.fillna(0.0).clip(0.0, 1.0)
+
+    def _attach_video_segments(self, valid: pd.DataFrame, topic_modeler: object) -> pd.DataFrame:
+        """
+        Assign segment at video-row level so a topic can appear in multiple segments.
+        """
+        out = valid.copy()
+        topic_ids = out["topic"].dropna().astype(int).unique().tolist()
+        topic_keywords = {
+            topic_id: topic_modeler.get_dominant_topic_keywords(topic_id)
+            for topic_id in topic_ids
+        }
+
+        def _segment_for_row(row: pd.Series) -> str:
+            topic_id = int(row["topic"])
+            keywords = topic_keywords.get(topic_id, [])
+            title = safe_text(row.get("title", ""))
+            return classify_trend_type(keywords, [title])
+
+        out["ranking_segment"] = out.apply(_segment_for_row, axis=1)
+        out["ranking_segment"] = out["ranking_segment"].fillna("general")
+        return out
+
     def _apply_anchor_score(self, topic_stats: pd.DataFrame) -> pd.DataFrame:
         out = topic_stats.copy()
         out["volume_norm"] = self.normalize_series(out["volume"])
@@ -133,10 +162,41 @@ class TrendScorer:
         )
         return out
 
+    def _apply_segment_global_merge(
+        self,
+        ranked_topics: pd.DataFrame,
+        base_score_col: str = "trend_score",
+    ) -> pd.DataFrame:
+        """
+        Build a single global ordering from segment-local rankings.
+        This keeps one leaderboard output while enforcing segment-first coverage.
+        """
+        out = ranked_topics.copy()
+        if out.empty or "ranking_segment" not in out.columns:
+            return out
+
+        if out["ranking_segment"].nunique(dropna=False) <= 1:
+            return out.sort_values(base_score_col, ascending=False).reset_index(drop=True)
+
+        out["segment_rank"] = out.groupby("ranking_segment")[base_score_col].rank(
+            method="first",
+            ascending=False,
+        )
+        max_rank = max(float(out["segment_rank"].max()), 1.0)
+        out["segment_round_score"] = (
+            1.0 - ((out["segment_rank"] - 1.0) / max_rank)
+        ).clip(lower=0.0, upper=1.0)
+
+        out["global_score_norm"] = self.normalize_series(out[base_score_col])
+        out["trend_score"] = (
+            0.7 * out["segment_round_score"] + 0.3 * out["global_score_norm"]
+        )
+        return out.sort_values("trend_score", ascending=False).reset_index(drop=True)
+
     def _build_lambdamart_training_frame(self, valid: pd.DataFrame) -> pd.DataFrame:
-        """Build per-date topic rows with next-day growth as pseudo relevance label."""
+        """Build per-date+segment topic rows with blended CTR+momentum relevance."""
         daily_topic = (
-            valid.groupby(["date", "topic"])
+            valid.groupby(["date", "ranking_segment", "topic"])
             .agg(
                 doc_count=("topic", "size"),
                 avg_views=("views", "mean"),
@@ -148,37 +208,48 @@ class TrendScorer:
                 avg_age_hours=("age_hours", "mean"),
             )
             .reset_index()
-            .sort_values(["topic", "date"])
+            .sort_values(["ranking_segment", "topic", "date"])
         )
         if daily_topic.empty:
             return daily_topic
+
         daily_topic = daily_topic[
             daily_topic["doc_count"] >= self.settings.lambdamart_min_topic_docs
         ].copy()
         if daily_topic.empty:
             return daily_topic
 
-        daily_topic["next_doc_count"] = daily_topic.groupby("topic")["doc_count"].shift(-1)
-        daily_topic["next_avg_engagement"] = daily_topic.groupby("topic")["avg_engagement"].shift(-1)
-        daily_topic = daily_topic.dropna(subset=["next_doc_count", "next_avg_engagement"]).copy()
-        if daily_topic.empty:
-            return daily_topic
+        daily_topic["prev_doc_count"] = (
+            daily_topic.groupby(["ranking_segment", "topic"])["doc_count"]
+            .shift(1)
+            .fillna(0.0)
+        )
+        daily_topic["momentum"] = (
+            (daily_topic["doc_count"] - daily_topic["prev_doc_count"])
+            / (daily_topic["prev_doc_count"] + 1.0)
+        )
 
-        growth = (daily_topic["next_doc_count"] - daily_topic["doc_count"]) / (
-            daily_topic["doc_count"] + 1.0
+        query_cols = ["date", "ranking_segment"]
+        daily_topic["ctr_recency_norm_q"] = self._minmax_by_group(
+            daily_topic,
+            "avg_proxy_ctr_recency",
+            query_cols,
         )
-        future_engagement_lift = (
-            daily_topic["next_avg_engagement"] / (daily_topic["avg_engagement"] + 1e-6)
+        daily_topic["momentum_norm_q"] = self._minmax_by_group(
+            daily_topic,
+            "momentum",
+            query_cols,
         )
-        label = growth + 0.15 * (future_engagement_lift - 1.0)
-        daily_topic["label_gain"] = np.clip(label, -1.0, 3.0)
-        # LambdaMART in LightGBM expects integer relevance labels.
-        # Use coarse per-date buckets to avoid over-reacting to tiny label noise.
-        pct = daily_topic.groupby("date")["label_gain"].rank(method="average", pct=True)
+        daily_topic["label_gain"] = (
+            0.7 * daily_topic["ctr_recency_norm_q"]
+            + 0.3 * daily_topic["momentum_norm_q"]
+        )
+
+        pct = daily_topic.groupby(query_cols)["label_gain"].rank(method="average", pct=True)
         daily_topic["label_relevance"] = pd.cut(
             pct,
-            bins=[0.0, 0.33, 0.66, 1.0],
-            labels=[0, 1, 2],
+            bins=[0.0, 0.2, 0.4, 0.6, 0.8, 1.0],
+            labels=[0, 1, 2, 3, 4],
             include_lowest=True,
         ).astype(int)
         return daily_topic
@@ -190,27 +261,27 @@ class TrendScorer:
         latest_date: pd.Timestamp,
     ) -> pd.DataFrame:
         out = topic_stats.copy()
-        out["ranker"] = "lambdamart_fallback"
-
-        if LGBMRanker is None:
-            print("lightgbm not installed; falling back to anchor-score ranking.")
-            out["trend_score"] = out["anchor_score"]
-            return out.sort_values("trend_score", ascending=False).reset_index(drop=True)
 
         train_df = self._build_lambdamart_training_frame(valid)
         if train_df.empty:
-            out["trend_score"] = out["anchor_score"]
-            return out.sort_values("trend_score", ascending=False).reset_index(drop=True)
+            raise RuntimeError(
+                "LambdaMART training frame is empty after segment/date preparation."
+            )
 
-        train_df = train_df.sort_values(["date", "topic"]).reset_index(drop=True)
-        query_sizes = train_df.groupby("date").size()
+        train_df = train_df.sort_values(["date", "ranking_segment", "topic"]).reset_index(drop=True)
+        query_sizes = train_df.groupby(["date", "ranking_segment"]).size()
         query_sizes = query_sizes[query_sizes > 1]
         if len(query_sizes) < 3 or int(query_sizes.sum()) < 25:
-            out["trend_score"] = out["anchor_score"]
-            return out.sort_values("trend_score", ascending=False).reset_index(drop=True)
+            raise RuntimeError(
+                "LambdaMART training requires at least 3 multi-topic (date, segment) queries and 25 rows."
+            )
 
-        train_df = train_df[train_df["date"].isin(query_sizes.index)].copy()
+        valid_queries = query_sizes.index.to_frame(index=False)
+        train_df = train_df.merge(valid_queries, on=["date", "ranking_segment"], how="inner")
+        train_df["segment_code"] = train_df["ranking_segment"].astype("category").cat.codes
+
         feature_cols = [
+            "segment_code",
             "doc_count",
             "avg_views",
             "avg_likes",
@@ -222,7 +293,7 @@ class TrendScorer:
         ]
         X_train = train_df[feature_cols]
         y_train = train_df["label_relevance"]
-        group = train_df.groupby("date").size().tolist()
+        group = train_df.groupby(["date", "ranking_segment"]).size().tolist()
 
         model = LGBMRanker(
             objective="lambdarank",
@@ -237,9 +308,15 @@ class TrendScorer:
         )
         model.fit(X_train, y_train, group=group)
 
+        segment_map = (
+            train_df[["ranking_segment", "segment_code"]]
+            .drop_duplicates()
+            .set_index("ranking_segment")["segment_code"]
+            .to_dict()
+        )
         pred_df = (
             valid[valid["date"] == latest_date]
-            .groupby("topic")
+            .groupby(["ranking_segment", "topic"])
             .agg(
                 doc_count=("topic", "size"),
                 avg_views=("views", "mean"),
@@ -253,29 +330,52 @@ class TrendScorer:
             .reset_index()
         )
         if pred_df.empty:
-            out["trend_score"] = out["anchor_score"]
-            return out.sort_values("trend_score", ascending=False).reset_index(drop=True)
+            raise RuntimeError(
+                "LambdaMART prediction frame is empty for the latest ranking date."
+            )
 
+        pred_df["segment_code"] = (
+            pred_df["ranking_segment"].map(segment_map).fillna(-1).astype(int)
+        )
         pred_df["lambdamart_score_raw"] = model.predict(pred_df[feature_cols])
         pred_df["lambdamart_score_norm"] = self.normalize_series(pred_df["lambdamart_score_raw"])
 
-        out = out.merge(
-            pred_df[["topic", "lambdamart_score_raw", "lambdamart_score_norm"]],
+        # Expand topic-level anchors into topic+segment rows seen at prediction time.
+        out = pred_df[["topic", "ranking_segment"]].drop_duplicates().merge(
+            out,
             on="topic",
             how="left",
         )
-        out["lambdamart_score_norm"] = out["lambdamart_score_norm"].fillna(0.0)
-        out["lambdamart_score_raw"] = out["lambdamart_score_raw"].fillna(0.0)
+        if out.empty:
+            raise RuntimeError(
+                "No overlapping topic/segment rows between topic stats and LambdaMART predictions."
+            )
+
+        out = out.merge(
+            pred_df[
+                [
+                    "topic",
+                    "ranking_segment",
+                    "lambdamart_score_raw",
+                    "lambdamart_score_norm",
+                ]
+            ],
+            on=["topic", "ranking_segment"],
+            how="left",
+        )
+        if out["lambdamart_score_norm"].isna().any() or out["lambdamart_score_raw"].isna().any():
+            raise RuntimeError(
+                "LambdaMART predictions are missing for one or more topic/segment rows."
+            )
 
         # Keep ranking behavior stable by blending learned and anchor signals.
         out["trend_score"] = (
             self.settings.lambdamart_blend_alpha * out["lambdamart_score_norm"]
             + (1.0 - self.settings.lambdamart_blend_alpha) * out["anchor_score"]
         )
-        out["ranker"] = "lambdamart_blended"
-        return out.sort_values("trend_score", ascending=False).reset_index(drop=True)
+        return self._apply_segment_global_merge(out, base_score_col="trend_score")
 
-    def score(self, videos_df: pd.DataFrame) -> pd.DataFrame:
+    def score(self, videos_df: pd.DataFrame, topic_modeler: object) -> pd.DataFrame:
         valid = videos_df[videos_df["topic"] != -1].copy()
         if valid.empty:
             return pd.DataFrame()
@@ -285,7 +385,7 @@ class TrendScorer:
         if valid.empty:
             return pd.DataFrame()
         valid = self._build_video_level_features(valid)
+        valid = self._attach_video_segments(valid, topic_modeler)
         topic_stats, latest_date = self._build_topic_stats(valid)
         topic_stats = self._apply_anchor_score(topic_stats)
-
         return self._apply_lambdamart_score(topic_stats, valid, latest_date)

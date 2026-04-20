@@ -123,6 +123,8 @@ FRAGMENTED_TITLE_BY_TREND_TYPE: dict[str, str] = {
     "beauty_lifestyle": "Fragmented Fashion & Beauty",
     "technology": "Fragmented Tech Buzz",
     "food": "Fragmented Food Content",
+    "seasonal": "Fragmented Seasonal Buzz",
+    "general": "Fragmented General Buzz",
 }
 
 DEFAULT_FRAGMENTED_TITLE = "Fragmented Viral Content"
@@ -133,6 +135,7 @@ FALLBACK_TITLE_BY_TREND_TYPE: dict[str, str] = {
     "entertainment": "Entertainment Content",
     "food": "Food & Dining Trend",
     "seasonal": "Seasonal Interest",
+    "general": "General Audience Trend",
 }
 
 DEFAULT_FALLBACK_TITLE = "General Viral Trend"

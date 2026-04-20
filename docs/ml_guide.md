@@ -51,7 +51,7 @@ Four rows share a meal preparation theme. `Day` labels two distinct trending dat
 </tr>
 <tr>
 <td>5</td>
-<td>Topic scoring — one row per topic with proxy CTR/freshness features, then a stability-tuned LambdaMART blend for <code>trend_score</code>.</td>
+<td>Topic scoring — topic-level features are expanded into topic-segment ranking rows, then a stability-tuned LambdaMART blend produces final <code>trend_score</code>.</td>
 <td>See §2.1.</td>
 </tr>
 <tr>
@@ -86,7 +86,7 @@ Four rows share a meal preparation theme. `Day` labels two distinct trending dat
 
 - Engagement — per-row mix of log-scaled views, likes, and comments; averaged within the topic (here, mean views ≈140,000, mean likes ≈10,000).
 
-- `trend_score` — first compute anchor features (normalized volume, engagement, momentum, proxy-CTR-with-recency, freshness). In parallel, LambdaMART learns a topic ranking signal from date-grouped pseudo-labels based on next-day lift. Final score is a weighted blend of learned rank signal and anchor score (`lambdamart_blend_alpha` in `Settings`). The UI sorts topics by `trend_score` descending.
+- `trend_score` — first compute anchor features (normalized volume, engagement, momentum, proxy-CTR-with-recency, freshness). In parallel, LambdaMART learns ranking from topic-segment-date rows: segment assignment is applied at video level, queries are grouped by (`date`, `ranking_segment`), and pseudo-label gain is blended from in-query CTR-recency and momentum. Final score is a weighted blend of learned rank signal and anchor score (`lambdamart_blend_alpha` in `Settings`). LambdaMART is required in this pipeline (no anchor-only fallback mode). The UI sorts rows by `trend_score` descending.
 
 #### 2.2 Marketer-facing fields (illustrative)
 

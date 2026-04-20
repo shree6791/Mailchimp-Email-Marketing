@@ -13,6 +13,8 @@ from src.constants.insights import (
     OUTSIDE_LLM_TOP_N_SUMMARY,
 )
 from src.constants.scoring import (
+    FRAGMENTED_ALLOWED_TREND_TYPES,
+    FRAGMENTED_MIN_TREND_SCORE,
     HIGH_ENGAGEMENT_MIN_LIKES,
     HIGH_ENGAGEMENT_MIN_TREND_SCORE,
     HIGH_ENGAGEMENT_MIN_VIEWS,
@@ -30,6 +32,20 @@ def _is_high_engagement_row(row: pd.Series) -> bool:
         or float(row.get("avg_views", 0)) >= HIGH_ENGAGEMENT_MIN_VIEWS
         or float(row.get("trend_score", 0)) >= HIGH_ENGAGEMENT_MIN_TREND_SCORE
     )
+
+
+def _is_fragmented_trend(
+    *,
+    topic_coherent: bool,
+    high_engagement: bool,
+    trend_type: str,
+    row: pd.Series,
+) -> bool:
+    if topic_coherent or not high_engagement:
+        return False
+    if trend_type not in FRAGMENTED_ALLOWED_TREND_TYPES:
+        return False
+    return float(row.get("trend_score", 0)) >= FRAGMENTED_MIN_TREND_SCORE
 
 
 def add_topic_keyword_columns(
@@ -81,7 +97,12 @@ def enrich_topic_insights_marketer_fields(
         trend_type = classify_trend_type(dominant_topic_keywords, sample_titles)
         topic_coherent = topic_is_coherent(dominant_topic_keywords, sample_titles)
         high_engagement = _is_high_engagement_row(row)
-        fragmented_trend = (not topic_coherent) and high_engagement
+        fragmented_trend = _is_fragmented_trend(
+            topic_coherent=topic_coherent,
+            high_engagement=high_engagement,
+            trend_type=trend_type,
+            row=row,
+        )
 
         topic_display_name = topic_namer.name_topic(
             keywords=dominant_topic_keywords,

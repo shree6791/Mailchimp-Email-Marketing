@@ -36,6 +36,8 @@ TOPIC_INSIGHTS_EXPORT_COLUMNS: tuple[str, ...] = (
     "momentum",
     "avg_proxy_ctr_recency",
     "trend_score",
+    "ranking_segment",
+    "segment_rank",
     "topic_keywords",
     "dominant_topic_keywords",
     "topic_label",
