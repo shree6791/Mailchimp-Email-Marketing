@@ -66,7 +66,7 @@ Four rows share a meal preparation theme. `Day` labels two distinct trending dat
 </tr>
 <tr>
 <td>8</td>
-<td>Marketer enrichment — sample titles, taxonomy and coherence checks; for the first N topics, request OpenAI <code>summary</code> and <code>campaign_copy</code> when checks pass, otherwise fall back to templates.</td>
+<td>Marketer enrichment — sample titles, taxonomy and coherence checks; for the first N topics (<code>llm_top_n</code>), request OpenAI <code>summary</code> and <code>campaign_copy</code> only when checks pass, otherwise use canned/template outputs and suppress campaign copy when not marketing-safe.</td>
 <td>See §2.2.</td>
 </tr>
 </tbody>

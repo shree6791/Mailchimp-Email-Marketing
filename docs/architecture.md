@@ -99,7 +99,7 @@ Execution order matches `TrendPipelineEngine` ([`src/pipeline/trend_engine.py`](
 
 Replay Step 7 metrics from CSV: `python -m src.evaluation outputs/topic_insights.csv`.
 
-Scoring (stage 6): topic-level proxy features (volume, momentum, engagement, proxy CTR, freshness) are blended with a non-personalized LambdaMART score. Training uses date-grouped pseudo-relevance from next-day topic lift; final `trend_score` is a stability blend (`lambdamart_blend_alpha`) of learned and anchor signals.
+Scoring (stage 6): topic-level proxy features (volume, momentum, engagement, proxy CTR, freshness) are blended with a non-personalized LambdaMART score. Training uses date-grouped pseudo-relevance from next-day topic lift; final `trend_score` is a stability blend (`lambdamart_blend_alpha`) of learned and anchor signals, with anchor-only fallback when learned ranking is unavailable or under-supported.
 
 Topic identifiers: `topic` integers are run-scoped, not stable across runs.
 
