@@ -1,8 +1,8 @@
 # Trend Engine HTTP API
 
-This repository exposes a small **FastAPI** service that reads pipeline output from **`topic_insights.csv`** (no database). It is intended for demos, local development, and the same contract the Streamlit dashboard can use when **`TREND_API_BASE_URL`** is set.
+Small **FastAPI** service over **`topic_insights.csv`** (no database): demos, local dev, and the same JSON contract the dashboard uses when **`TREND_API_BASE_URL`** is set (see README **Configuration**).
 
-Interactive schema and “try it” UI: **`http://127.0.0.1:8000/docs`** (Swagger UI) and **`/redoc`**.
+Interactive schema: **`http://127.0.0.1:8000/docs`** (Swagger) and **`/redoc`**.
 
 ---
 
@@ -114,5 +114,5 @@ pytest tests/test_api_endpoints.py -v
 
 ## Related
 
-- Streamlit loads this API when **`TREND_API_BASE_URL`** points at the running service (see `src/serving/streamlit/data_loading.py`).
-- Broader system architecture: [`architecture.md`](architecture.md).
+- [`architecture.md`](architecture.md) — full system layout (pipeline, artifacts, Streamlit).
+- [`src/serving/streamlit/data_loading.py`](../src/serving/streamlit/data_loading.py) — dashboard HTTP vs CSV loading.

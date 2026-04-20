@@ -99,6 +99,12 @@ Execution order matches `TrendPipelineEngine` ([`src/pipeline/trend_engine.py`](
 
 Replay Step 7 metrics from CSV: `python -m src.evaluation outputs/topic_insights.csv`.
 
+**Offline ranking (Step 7) — blended gain:** Proxy NDCG@K compares the sort order of `trend_score` to an ideal ordering by per-row **blended proxy gain**. After min–max normalization within the evaluated slice, gain is:
+
+`0.5 × ctr_recency_norm + 0.3 × volume_norm + 0.2 × momentum_norm`
+
+(where the inputs are `avg_proxy_ctr_recency`, `volume`, and `momentum`). Implementation: [`src/evaluation/metrics.py`](../src/evaluation/metrics.py) (`build_blended_gain`, `proxy_ndcg`).
+
 Scoring (stage 6): after topics are discovered, rows are organized into date+segment groups so LambdaMART can compare similar items against each other. The model is trained on those grouped rows, then used to score **only** rows from the **latest `trending_date`** in the input (inference `pred_df` is filtered to that day). The export repeats **`trending_snapshot_date`** on every row so downstream tools know the as-of day. Topics with no videos on that day do not appear in `topic_insights.csv`. The final `trend_score` blends the learned ranking signal with stable anchor signals (configured by `lambdamart_blend_alpha`).
 
 Optional **FastAPI** stub: [`app.py`](../app.py) exposes list/detail/post endpoints over `topic_insights.csv` for demos (`uvicorn app:app`); trend handlers live in [`src/api/trends.py`](../src/api/trends.py), campaign stub in [`src/api/campaigns.py`](../src/api/campaigns.py).
@@ -129,11 +135,13 @@ flowchart TB
 
 ### 6. Artifacts and schema contracts
 
+`main.py` writes checkpoints under **`data/processed/`** and finals under **`outputs/`** (paths configurable via `Settings`). Downloaded input lands in **`data/raw/`** first.
+
 #### 6.1 Files produced
 
 | Directory | File name | Contents (summary) |
 |-----------|-----------|----------------------|
-| `data/raw/` | Region CSV (default `USvideos.csv`) | Raw Kaggle export after download. |
+| `data/raw/` | Region CSV (default `USvideos.csv`) | Fetched from Kaggle (`datasnaek/youtube-new`) via **`kagglehub`**; see [`TrendingDatasetLoader`](../src/ingestion/trending_dataset_loader.py). |
 | `data/processed/` | `videos_text_before_topics.csv` | Input metrics plus `document` and `cleaned_text` prior to topic assignment. |
 | `outputs/` | `videos_with_topics.csv` | Per-video metrics with `topic` and `topic_confidence`. |
 | `outputs/` | `topic_insights.csv` | One row per scored topic-segment entry for the **latest trending day in the dataset**: metrics, `ranking_segment` / `segment_rank`, **`trending_snapshot_date`** (ISO date of that day), keywords, LLM fields, nested `campaign_copy`. |
