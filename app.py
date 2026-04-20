@@ -13,6 +13,7 @@ from src.serving.streamlit.dashboard_filters import (
     collect_trend_dashboard_filters,
 )
 from src.serving.streamlit.data_loading import load_trend_dashboard_data
+from src.serving.streamlit.theme import inject_mailchimp_theme
 
 
 @st.cache_data
@@ -26,6 +27,8 @@ def main() -> None:
         page_icon="📈",
         layout="wide",
     )
+
+    inject_mailchimp_theme()
 
     st.title("📈 Mailchimp Trend Engine")
     st.caption(

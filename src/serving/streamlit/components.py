@@ -2,10 +2,17 @@
 
 from __future__ import annotations
 
+import altair as alt
 import pandas as pd
 import streamlit as st
 
 from src.constants.dashboard import TREND_TYPE_BADGE_COLORS
+from src.constants.mailchimp_ui import (
+    MAILCHIMP_CANVAS,
+    MAILCHIMP_SURFACE,
+    MAILCHIMP_WHITE,
+    MAILCHIMP_YELLOW,
+)
 from src.serving.streamlit.formatting import compact_number, pill, pretty_trend_type
 
 
@@ -18,12 +25,12 @@ def render_badges(row: pd.Series) -> None:
 
     badges = [
         pill(pretty_trend_type(trend_type), bg, fg),
-        pill("Mixed / Noisy", "#FEF3C7", "#92400E")
+        pill("Mixed / Noisy", MAILCHIMP_SURFACE, MAILCHIMP_WHITE, border=MAILCHIMP_YELLOW)
         if fragmented
-        else pill("Clear", "#DBEAFE", "#1D4ED8"),
-        pill("Campaign Ready", "#DCFCE7", "#166534")
+        else pill("Clear", MAILCHIMP_SURFACE, MAILCHIMP_WHITE, border=MAILCHIMP_WHITE),
+        pill("Campaign Ready", MAILCHIMP_YELLOW, MAILCHIMP_CANVAS)
         if marketing_safe is True
-        else pill("No Campaign", "#F3F4F6", "#374151"),
+        else pill("No Campaign", MAILCHIMP_SURFACE, "#A8A29E"),
     ]
 
     html = "".join(badges)
@@ -47,13 +54,15 @@ def render_statline(row: pd.Series) -> None:
 
     momentum_prefix = "+" if momentum > 0 else ""
     text = (
-        f"**Opportunity** {opportunity}  ·  "
-        f"**Trend Strength** {score}  ·  "
-        f"**Views** {views}  ·  "
-        f"**Likes** {likes}  ·  "
-        f"**Growth** {momentum_prefix}{momentum:.2f}"
+        f"<span style='color:{MAILCHIMP_WHITE};'>"
+        f"<strong style='color:{MAILCHIMP_YELLOW};'>Opportunity</strong> {opportunity}  ·  "
+        f"<strong style='color:{MAILCHIMP_YELLOW};'>Trend Strength</strong> {score}  ·  "
+        f"<strong style='color:{MAILCHIMP_YELLOW};'>Views</strong> {views}  ·  "
+        f"<strong style='color:{MAILCHIMP_YELLOW};'>Likes</strong> {likes}  ·  "
+        f"<strong style='color:{MAILCHIMP_YELLOW};'>Growth</strong> {momentum_prefix}{momentum:.2f}"
+        f"</span>"
     )
-    st.markdown(text)
+    st.markdown(text, unsafe_allow_html=True)
 
 
 def render_trend_card(row: pd.Series) -> None:
@@ -156,10 +165,23 @@ def render_charts(topic_insights: pd.DataFrame) -> None:
             ["topic_display_name", "opportunity_score"]
         ].copy().sort_values("opportunity_score", ascending=False).head(10)
 
-        st.bar_chart(
-            opp_df.set_index("topic_display_name"),
-            height=260,
+        bar = (
+            alt.Chart(opp_df)
+            .mark_bar(color=MAILCHIMP_YELLOW, cornerRadiusEnd=3)
+            .encode(
+                x=alt.X("opportunity_score:Q", title="Opportunity score"),
+                y=alt.Y("topic_display_name:N", sort="-x", title=None),
+            )
+            .properties(height=260)
+            .configure_axis(
+                labelColor=MAILCHIMP_WHITE,
+                titleColor=MAILCHIMP_WHITE,
+                gridColor="rgba(255, 224, 27, 0.12)",
+                domainColor="rgba(255, 224, 27, 0.35)",
+            )
+            .configure_view(strokeWidth=0)
         )
+        st.altair_chart(bar, use_container_width=True)
 
 
 def render_trend_card_grid(filtered: pd.DataFrame) -> None:

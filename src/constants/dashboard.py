@@ -1,5 +1,7 @@
 """Streamlit dashboard: sort keys, filter option labels, trend display strings."""
 
+from src.constants.mailchimp_ui import MAILCHIMP_CANVAS, MAILCHIMP_YELLOW
+
 SORT_OPTIONS: dict[str, str] = {
     "Best Opportunities": "opportunity_score",
     "Trend Strength": "trend_score",
@@ -22,10 +24,10 @@ TREND_CATEGORY_LABELS: dict[str, str] = {
 }
 
 TREND_TYPE_BADGE_COLORS: dict[str, tuple[str, str]] = {
-    "technology": ("#DBEAFE", "#1D4ED8"),
-    "beauty_lifestyle": ("#FCE7F3", "#BE185D"),
-    "entertainment": ("#EDE9FE", "#6D28D9"),
-    "food": ("#FEF3C7", "#B45309"),
-    "seasonal": ("#DCFCE7", "#15803D"),
-    "general": ("#E5E7EB", "#374151"),
+    "technology": (MAILCHIMP_YELLOW, MAILCHIMP_CANVAS),
+    "beauty_lifestyle": (MAILCHIMP_YELLOW, MAILCHIMP_CANVAS),
+    "entertainment": (MAILCHIMP_YELLOW, MAILCHIMP_CANVAS),
+    "food": (MAILCHIMP_YELLOW, MAILCHIMP_CANVAS),
+    "seasonal": (MAILCHIMP_YELLOW, MAILCHIMP_CANVAS),
+    "general": (MAILCHIMP_YELLOW, MAILCHIMP_CANVAS),
 }

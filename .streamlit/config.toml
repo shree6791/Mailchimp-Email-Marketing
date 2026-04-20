@@ -1,0 +1,13 @@
+# Mailchimp-inspired palette tuned for interview demo readability.
+# Keeps brand direction (dark + yellow + white) with slightly lighter surfaces.
+
+[theme]
+base = "dark"
+primaryColor = "#FFE01B"
+backgroundColor = "#2A211A"
+secondaryBackgroundColor = "#3A3129"
+textColor = "#FFFFFF"
+font = "sans serif"
+
+[client]
+toolbarMode = "minimal"

@@ -3,7 +3,8 @@
 from src.constants.dashboard import TREND_CATEGORY_LABELS
 
 
-def pill(text: str, bg: str, fg: str = "#111827") -> str:
+def pill(text: str, bg: str, fg: str = "#111827", *, border: str | None = None) -> str:
+    border_css = f"border:1px solid {border};" if border else "border:1px solid transparent;"
     return f"""
 <span style="
     display:inline-flex;
@@ -12,6 +13,7 @@ def pill(text: str, bg: str, fg: str = "#111827") -> str:
     border-radius:999px;
     background:{bg};
     color:{fg};
+    {border_css}
     font-size:0.78rem;
     font-weight:600;
     line-height:1.2;
