@@ -4,6 +4,8 @@ Augment per-topic score rows from ``TrendScorer`` with keywords, heuristics, and
 
 from __future__ import annotations
 
+from typing import Mapping
+
 import pandas as pd
 
 from src.constants.insights import (
@@ -51,12 +53,24 @@ def _is_fragmented_trend(
 def add_topic_keyword_columns(
     topic_insights: pd.DataFrame,
     topic_modeler: TopicModeler,
+    topic_keywords_by_topic: Mapping[int, list[str]] | None = None,
+    dominant_keywords_by_topic: Mapping[int, list[str]] | None = None,
 ) -> None:
-    topic_insights["topic_keywords"] = topic_insights["topic"].apply(
-        lambda topic_id: topic_modeler.get_topic_keywords(int(topic_id))
-    )
+    def _topic_keywords(topic_id: int) -> list[str]:
+        key = int(topic_id)
+        if topic_keywords_by_topic is not None and key in topic_keywords_by_topic:
+            return list(topic_keywords_by_topic[key])
+        return topic_modeler.get_topic_keywords(key)
+
+    def _dominant_keywords(topic_id: int) -> list[str]:
+        key = int(topic_id)
+        if dominant_keywords_by_topic is not None and key in dominant_keywords_by_topic:
+            return list(dominant_keywords_by_topic[key])
+        return topic_modeler.get_dominant_topic_keywords(key)
+
+    topic_insights["topic_keywords"] = topic_insights["topic"].apply(_topic_keywords)
     topic_insights["dominant_topic_keywords"] = topic_insights["topic"].apply(
-        lambda topic_id: topic_modeler.get_dominant_topic_keywords(int(topic_id))
+        _dominant_keywords
     )
     topic_insights["topic_label"] = topic_insights["topic_keywords"].apply(
         lambda keywords: ", ".join(keywords[:5]) if keywords else "unknown_topic"

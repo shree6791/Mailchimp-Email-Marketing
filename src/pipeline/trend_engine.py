@@ -30,6 +30,28 @@ class TrendPipelineEngine:
         self.topic_namer = TopicNamer()
         self.trend_scorer = TrendScorer(settings)
         self.insight_generator = InsightGenerator(model=settings.llm_model_name)
+        self._topic_keywords_cache: dict[int, list[str]] = {}
+        self._dominant_topic_keywords_cache: dict[int, list[str]] = {}
+
+    def _refresh_topic_keyword_cache(self, videos_df: pd.DataFrame) -> None:
+        """
+        Precompute per-topic keyword lists once for reuse across scoring and enrichment.
+        """
+        topic_ids = (
+            videos_df.loc[videos_df["topic"] != -1, "topic"]
+            .dropna()
+            .astype(int)
+            .unique()
+            .tolist()
+        )
+        self._topic_keywords_cache = {
+            topic_id: self.topic_modeler.get_topic_keywords(topic_id)
+            for topic_id in topic_ids
+        }
+        self._dominant_topic_keywords_cache = {
+            topic_id: self.topic_modeler.get_dominant_topic_keywords(topic_id)
+            for topic_id in topic_ids
+        }
 
     def prepare_documents(self, videos_df: pd.DataFrame) -> pd.DataFrame:
         videos_df = videos_df.copy()
@@ -65,7 +87,12 @@ class TrendPipelineEngine:
 
     def score_topic_aggregates(self, videos_df: pd.DataFrame) -> pd.DataFrame:
         """Per-topic aggregates from ``TrendScorer`` (no keywords or LLM)."""
-        topic_insights = self.trend_scorer.score(videos_df, self.topic_modeler)
+        self._refresh_topic_keyword_cache(videos_df)
+        topic_insights = self.trend_scorer.score(
+            videos_df,
+            self.topic_modeler,
+            dominant_keywords_by_topic=self._dominant_topic_keywords_cache,
+        )
         if topic_insights.empty:
             raise RuntimeError(
                 "Topic scoring produced no results. Check input data or date parsing."
@@ -75,7 +102,12 @@ class TrendPipelineEngine:
     def attach_topic_keywords(self, topic_insights: pd.DataFrame) -> pd.DataFrame:
         """Add ``topic_keywords`` / labels from the fitted topic model."""
         out = topic_insights.copy()
-        add_topic_keyword_columns(out, self.topic_modeler)
+        add_topic_keyword_columns(
+            out,
+            self.topic_modeler,
+            topic_keywords_by_topic=self._topic_keywords_cache,
+            dominant_keywords_by_topic=self._dominant_topic_keywords_cache,
+        )
         return out
 
     def log_topic_ranking_evaluation(self, topic_insights: pd.DataFrame) -> None:

@@ -1,4 +1,5 @@
 import re
+from typing import Mapping
 
 from lightgbm import LGBMRanker
 import numpy as np
@@ -124,16 +125,27 @@ class TrendScorer:
         out = (frame[value_col] - mins) / (denom + 1e-12)
         return out.fillna(0.0).clip(0.0, 1.0)
 
-    def _attach_video_segments(self, valid: pd.DataFrame, topic_modeler: object) -> pd.DataFrame:
+    def _attach_video_segments(
+        self,
+        valid: pd.DataFrame,
+        topic_modeler: object,
+        dominant_keywords_by_topic: Mapping[int, list[str]] | None = None,
+    ) -> pd.DataFrame:
         """
         Assign segment at video-row level so a topic can appear in multiple segments.
         """
         out = valid.copy()
-        topic_ids = out["topic"].dropna().astype(int).unique().tolist()
-        topic_keywords = {
-            topic_id: topic_modeler.get_dominant_topic_keywords(topic_id)
-            for topic_id in topic_ids
-        }
+        if dominant_keywords_by_topic is None:
+            topic_ids = out["topic"].dropna().astype(int).unique().tolist()
+            topic_keywords = {
+                topic_id: topic_modeler.get_dominant_topic_keywords(topic_id)
+                for topic_id in topic_ids
+            }
+        else:
+            topic_keywords = {
+                int(topic_id): keywords
+                for topic_id, keywords in dominant_keywords_by_topic.items()
+            }
 
         def _segment_for_row(row: pd.Series) -> str:
             topic_id = int(row["topic"])
@@ -375,7 +387,12 @@ class TrendScorer:
         )
         return self._apply_segment_global_merge(out, base_score_col="trend_score")
 
-    def score(self, videos_df: pd.DataFrame, topic_modeler: object) -> pd.DataFrame:
+    def score(
+        self,
+        videos_df: pd.DataFrame,
+        topic_modeler: object,
+        dominant_keywords_by_topic: Mapping[int, list[str]] | None = None,
+    ) -> pd.DataFrame:
         valid = videos_df[videos_df["topic"] != -1].copy()
         if valid.empty:
             return pd.DataFrame()
@@ -385,7 +402,11 @@ class TrendScorer:
         if valid.empty:
             return pd.DataFrame()
         valid = self._build_video_level_features(valid)
-        valid = self._attach_video_segments(valid, topic_modeler)
+        valid = self._attach_video_segments(
+            valid,
+            topic_modeler,
+            dominant_keywords_by_topic=dominant_keywords_by_topic,
+        )
         topic_stats, latest_date = self._build_topic_stats(valid)
         topic_stats = self._apply_anchor_score(topic_stats)
         return self._apply_lambdamart_score(topic_stats, valid, latest_date)
