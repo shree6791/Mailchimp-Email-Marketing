@@ -51,12 +51,12 @@ Four rows share a meal preparation theme. `Day` labels two distinct trending dat
 </tr>
 <tr>
 <td>5</td>
-<td>Topic scoring — one row per topic: volume, momentum, blended engagement, then <code>trend_score</code>.</td>
+<td>Topic scoring — one row per topic with proxy CTR/freshness features, then a stability-tuned LambdaMART blend for <code>trend_score</code>.</td>
 <td>See §2.1.</td>
 </tr>
 <tr>
 <td>6</td>
-<td>Offline ranking evaluation — proxy NDCG on the top-<code>N</code> slice (same <code>N</code> as LLM calls); uses <code>volume</code> and <code>trend_score</code> only, immediately after scoring and before topic-keyword columns are attached. Standard demo step before any LLM call; see [architecture.md](architecture.md) §4.</td>
+<td>Offline ranking evaluation — proxy NDCG on the top-<code>N</code> slice (same <code>N</code> as LLM calls); uses blended gain (0.5·CTR-recency + 0.3·volume + 0.2·momentum) against <code>trend_score</code>, immediately after scoring and before topic-keyword columns are attached. Standard demo step before any LLM call; see [architecture.md](architecture.md) §4.</td>
 <td>See §2.3.</td>
 </tr>
 <tr>
@@ -86,7 +86,7 @@ Four rows share a meal preparation theme. `Day` labels two distinct trending dat
 
 - Engagement — per-row mix of log-scaled views, likes, and comments; averaged within the topic (here, mean views ≈140,000, mean likes ≈10,000).
 
-- `trend_score` — volume, mean engagement, and momentum are min–max scaled to [0, 1] across all topics in the run, then combined as 0.35·volume + 0.30·engagement + 0.35·momentum. The UI sorts topics by `trend_score` descending. A small, low-engagement cluster would usually receive a lower normalized volume than this example.
+- `trend_score` — first compute anchor features (normalized volume, engagement, momentum, proxy-CTR-with-recency, freshness). In parallel, LambdaMART learns a topic ranking signal from date-grouped pseudo-labels based on next-day lift. Final score is a weighted blend of learned rank signal and anchor score (`lambdamart_blend_alpha` in `Settings`). The UI sorts topics by `trend_score` descending.
 
 #### 2.2 Marketer-facing fields (illustrative)
 
@@ -98,7 +98,7 @@ Four rows share a meal preparation theme. `Day` labels two distinct trending dat
 
 #### 2.3 Offline ranking evaluation (no human labels)
 
-Without editorial judgments, the pipeline surfaces proxy NDCG@N: it compares `trend_score` ordering to an ideal ordering by a simple proxy (default `volume`) on the same top-N slice used for LLM calls. This metric is part of the standard run and supports engineering review; it is not a substitute for A/B tests or human evaluation. Set `log_ranking_evaluation=False` on `Settings` only to skip the block (for example in automation). Recompute from a saved CSV: `python -m src.evaluation outputs/topic_insights.csv`.
+Without editorial judgments, the pipeline surfaces proxy NDCG@N: it compares `trend_score` ordering to an ideal ordering by blended proxy gain on the same top-N slice used for LLM calls. Blended gain is `0.5*ctr_recency_norm + 0.3*volume_norm + 0.2*momentum_norm`, where `ctr_recency_norm` comes from `avg_proxy_ctr_recency`. This metric is part of the standard run and supports engineering review; it is not a substitute for A/B tests or human evaluation. Set `log_ranking_evaluation=False` on `Settings` only to skip the block (for example in automation). Recompute from a saved CSV: `python -m src.evaluation outputs/topic_insights.csv`.
 
 ---
 

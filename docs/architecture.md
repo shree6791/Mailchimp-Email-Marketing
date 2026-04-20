@@ -92,14 +92,14 @@ Execution order matches `TrendPipelineEngine` ([`src/pipeline/trend_engine.py`](
 | 4 | Step 4: Save text-prep checkpoint | `videos_text_before_topics.csv` | `save_text_prep_checkpoint` |
 | 5 | Step 5: Embeddings + topic assignment | Adds `topic`, `topic_confidence` | `EmbeddingService.encode`, `TopicModeler.fit_transform` |
 | 6 | Step 6: Trend scoring | Per-topic aggregates; excludes `topic == -1` | `score_topic_aggregates` → [`TrendScorer.score`](../src/ml/trends/trend_scorer.py) |
-| 7 | Step 7: Offline ranking evaluation | Console metrics (proxy NDCG; uses `volume` / `trend_score` only) | `log_topic_ranking_evaluation` → [`log_ranking_evaluation`](../src/evaluation/reporting.py) |
+| 7 | Step 7: Offline ranking evaluation | Console metrics (proxy NDCG; uses blended gain vs `trend_score`) | `log_topic_ranking_evaluation` → [`log_ranking_evaluation`](../src/evaluation/reporting.py) |
 | 8 | Step 8: Attach topic keywords | `topic_keywords`, `topic_label`, … | `attach_topic_keywords` → [`add_topic_keyword_columns`](../src/ml/trends/topic_insight_enrichment.py) |
 | 9 | Step 9: Marketer insights | `summary`, `campaign_copy`, … | `enrich_marketer_insights` → [`enrich_topic_insights_marketer_fields`](../src/ml/trends/topic_insight_enrichment.py) |
 | 10 | Step 10: Save final outputs | `videos_with_topics.csv`, `topic_insights.csv` | `save_final_artifacts` |
 
 Replay Step 7 metrics from CSV: `python -m src.evaluation outputs/topic_insights.csv`.
 
-Scoring (stage 6): fixed 0.35 / 0.30 / 0.35 blend on min–max–normalized volume, mean log-engagement, and momentum—not supervised learning-to-rank.
+Scoring (stage 6): topic-level proxy features (volume, momentum, engagement, proxy CTR, freshness) are blended with a non-personalized LambdaMART score. Training uses date-grouped pseudo-relevance from next-day topic lift; final `trend_score` is a stability blend (`lambdamart_blend_alpha`) of learned and anchor signals.
 
 Topic identifiers: `topic` integers are run-scoped, not stable across runs.
 

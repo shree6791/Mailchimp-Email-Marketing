@@ -30,6 +30,7 @@ TOPIC_INSIGHTS_EXPORT_COLUMNS: tuple[str, ...] = (
     "avg_likes",
     "avg_comments",
     "momentum",
+    "avg_proxy_ctr_recency",
     "trend_score",
     "topic_keywords",
     "dominant_topic_keywords",

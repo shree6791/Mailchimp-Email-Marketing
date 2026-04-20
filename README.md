@@ -1,6 +1,6 @@
 ## Mailchimp Trend Engine
 
-End-to-end **batch pipeline** plus a **Streamlit** dashboard. It loads public YouTube trending data, clusters videos with BERTopic, scores topics heuristically, optionally logs **proxy NDCG** (no human labels), then—when configured—calls OpenAI for summaries and campaign copy on the top topics.
+End-to-end **batch pipeline** plus a **Streamlit** dashboard. It loads public YouTube trending data, clusters videos with BERTopic, scores topics with a stability-tuned **LambdaMART** ranker (anchored by proxy CTR and momentum features), optionally logs **proxy NDCG** (no human labels), then—when configured—calls OpenAI for summaries and campaign copy on the top topics.
 
 This repo does **not** connect to Mailchimp or other ESP APIs; it writes local CSVs and serves a local UI.
 
@@ -46,7 +46,7 @@ python -m spacy download en_core_web_sm
 ### Configuration
 
 - **OpenAI:** create `.env` in the repo root with `OPENAI_API_KEY=<secret>` if you want LLM-generated insights.
-- **Pipeline:** edit [`src/config/settings.py`](src/config/settings.py) (`Settings`) for paths, row limits, models, `log_ranking_evaluation`, `llm_top_n`, etc.
+- **Pipeline:** edit [`src/config/settings.py`](src/config/settings.py) (`Settings`) for paths, row limits, models, LambdaMART knobs (`lambdamart_*`), `log_ranking_evaluation`, `llm_top_n`, etc.
 
 ### Run
 
@@ -70,7 +70,7 @@ Default loader uses the Kaggle dataset `datasnaek/youtube-new` (`USvideos.csv`) 
 
 ### Evaluation
 
-Offline proxy NDCG lives in [`src/evaluation/`](src/evaluation/); behavior and interpretation are documented in [`docs/architecture.md`](docs/architecture.md). Recompute from an export:
+Offline proxy NDCG lives in [`src/evaluation/`](src/evaluation/) and uses blended gain (`0.5*ctr_recency_norm + 0.3*volume_norm + 0.2*momentum_norm`) against `trend_score`; behavior and interpretation are documented in [`docs/architecture.md`](docs/architecture.md). Recompute from an export:
 
 ```bash
 python -m src.evaluation outputs/topic_insights.csv

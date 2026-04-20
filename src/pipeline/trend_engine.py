@@ -26,7 +26,7 @@ class TrendPipelineEngine:
         self.embedding_service = EmbeddingService(settings.embedding_model_name)
         self.topic_modeler = TopicModeler(settings)
         self.topic_namer = TopicNamer()
-        self.trend_scorer = TrendScorer()
+        self.trend_scorer = TrendScorer(settings)
         self.insight_generator = InsightGenerator(model=settings.llm_model_name)
 
     def prepare_documents(self, videos_df: pd.DataFrame) -> pd.DataFrame:

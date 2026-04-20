@@ -7,6 +7,7 @@ import pandas as pd
 import streamlit as st
 
 from src.constants.dashboard import TREND_TYPE_BADGE_COLORS
+from src.constants.insights import OUTSIDE_LLM_TOP_N_SUMMARY
 from src.constants.mailchimp_ui import (
     MAILCHIMP_CANVAS,
     MAILCHIMP_SURFACE,
@@ -14,6 +15,22 @@ from src.constants.mailchimp_ui import (
     MAILCHIMP_YELLOW,
 )
 from src.serving.streamlit.formatting import compact_number, pill, pretty_trend_type
+
+
+def _campaign_unavailable_reason(row: pd.Series) -> str:
+    marketing_safe = row.get("marketing_safe", None)
+    fragmented = bool(row.get("fragmented_trend", False))
+    summary = str(row.get("summary", ""))
+
+    if marketing_safe is False:
+        return (
+            "Campaign copy not shown: topic is mixed/noisy."
+            if fragmented
+            else "Campaign copy not shown: topic is not marketing-safe."
+        )
+    if marketing_safe is None or summary == OUTSIDE_LLM_TOP_N_SUMMARY:
+        return "Campaign copy not generated: outside LLM top-N scope."
+    return "Campaign copy unavailable for this trend."
 
 
 def render_badges(row: pd.Series) -> None:
@@ -83,6 +100,8 @@ def render_trend_card(row: pd.Series) -> None:
             st.markdown(
                 f"**Suggested Subject:** {suggestion.get('suggested_subject', '')}"
             )
+        else:
+            st.caption(_campaign_unavailable_reason(row))
 
         with st.expander("Details"):
             topic_label = row.get("topic_label", "")
@@ -108,15 +127,15 @@ def render_trend_card(row: pd.Series) -> None:
                 st.markdown("**Email Hook**")
                 st.write(suggestion.get("email_hook", ""))
             else:
-                st.caption("No campaign suggestion for this trend.")
+                st.caption(_campaign_unavailable_reason(row))
 
 
 def render_top_metrics(topic_insights: pd.DataFrame, filtered: pd.DataFrame) -> None:
-    a, b, c, d = st.columns(4)
-    a.metric("Topics Identified", len(topic_insights))
-    b.metric("Top Trends", len(filtered))
-    c.metric("Actionable Trends", int((topic_insights["marketing_safe"] == True).sum()))
-    d.metric("Noisy Topics", int((topic_insights["fragmented_trend"] == True).sum()))
+    """Dataset-level counts only; card count is controlled by sidebar (avoid misleading KPIs)."""
+    _ = filtered  # kept for call-site stability with app.py
+    a, b = st.columns(2)
+    a.metric("Topics identified", len(topic_insights))
+    b.metric("Mixed / noisy topics", int((topic_insights["fragmented_trend"] == True).sum()))
 
 
 def render_charts(topic_insights: pd.DataFrame) -> None:

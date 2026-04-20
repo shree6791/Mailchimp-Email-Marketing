@@ -6,6 +6,7 @@ bertopic
 hdbscan
 umap-learn
 scikit-learn
+lightgbm
 kagglehub
 openai
 python-dotenv

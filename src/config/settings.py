@@ -20,7 +20,16 @@ class Settings:
     stop_words_language: str = "english"
 
     top_n_topics_to_show: int = 5
-    llm_top_n: int = 5
+    llm_top_n: int = 10
     # Standard demo: proxy NDCG@K (K = llm_top_n) after ranking, before LLM. False skips the block.
     log_ranking_evaluation: bool = True
     llm_model_name: str = "gpt-4.1-mini"
+
+    # LambdaMART ranker (non-personalized LTR) tuned for stable demo behavior.
+    lambdamart_n_estimators: int = 160
+    lambdamart_learning_rate: float = 0.06
+    lambdamart_num_leaves: int = 31
+    lambdamart_random_state: int = 42
+    lambdamart_min_topic_docs: int = 2
+    # Blend learned score with heuristic to keep output stable on small data slices.
+    lambdamart_blend_alpha: float = 0.15

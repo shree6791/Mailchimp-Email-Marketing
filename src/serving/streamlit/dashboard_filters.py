@@ -23,7 +23,7 @@ class TrendDashboardFilters:
     clarity: str
     show_all_topics_including_non_llm: bool
     sort_column: str
-    top_n: int
+    page_size: int
 
 
 def collect_trend_dashboard_filters(topic_insights: pd.DataFrame) -> TrendDashboardFilters:
@@ -42,13 +42,19 @@ def collect_trend_dashboard_filters(topic_insights: pd.DataFrame) -> TrendDashbo
     campaign_readiness = st.sidebar.selectbox(
         "Campaign Readiness",
         CAMPAIGN_READINESS_OPTIONS,
+        index=1,
     )
 
     clarity = st.sidebar.selectbox("Clarity", CLARITY_OPTIONS)
 
     show_all_topics_including_non_llm = st.sidebar.checkbox(
-        "Show all topics",
-        value=False,
+        "Include topics outside LLM top-N",
+        value=True,
+        help=(
+            "When on (default), lists every topic in the export; beyond the first llm_top_n "
+            "ranked topics, summaries show a placeholder (no LLM call). When off, only topics "
+            "with full LLM summaries are listed (typically llm_top_n rows). Use pagination under Trends."
+        ),
     )
 
     sort_label = st.sidebar.selectbox(
@@ -58,7 +64,13 @@ def collect_trend_dashboard_filters(topic_insights: pd.DataFrame) -> TrendDashbo
     )
     sort_column = SORT_OPTIONS[sort_label]
 
-    top_n = st.sidebar.slider("Number of Trends", min_value=6, max_value=40, value=10)
+    page_size = st.sidebar.slider(
+        "Trends per page",
+        min_value=4,
+        max_value=24,
+        value=6,
+        help="How many topic cards to show at once. Use Next/Previous below the chart to browse all matching topics.",
+    )
 
     return TrendDashboardFilters(
         category=category,
@@ -66,7 +78,7 @@ def collect_trend_dashboard_filters(topic_insights: pd.DataFrame) -> TrendDashbo
         clarity=clarity,
         show_all_topics_including_non_llm=show_all_topics_including_non_llm,
         sort_column=sort_column,
-        top_n=top_n,
+        page_size=page_size,
     )
 
 
@@ -97,4 +109,18 @@ def apply_trend_dashboard_filters(
     return filtered.sort_values(
         by=filters.sort_column,
         ascending=False,
-    ).head(filters.top_n)
+    ).reset_index(drop=True)
+
+
+def paginate_dataframe(df: pd.DataFrame, page_idx: int, page_size: int) -> pd.DataFrame:
+    """Return one page of rows from a sorted dataframe."""
+    if df.empty or page_size <= 0:
+        return df.iloc[0:0]
+    start = page_idx * page_size
+    return df.iloc[start : start + page_size]
+
+
+def max_page_index(n_rows: int, page_size: int) -> int:
+    if n_rows <= 0 or page_size <= 0:
+        return 0
+    return (n_rows - 1) // page_size

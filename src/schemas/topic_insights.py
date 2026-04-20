@@ -26,6 +26,7 @@ class TopicInsightRow(BaseModel):
     avg_likes: float = 0.0
     avg_comments: float = 0.0
     momentum: float = 0.0
+    avg_proxy_ctr_recency: float = 0.0
     trend_score: float = 0.0
 
     topic_keywords: list[str] = Field(default_factory=list)

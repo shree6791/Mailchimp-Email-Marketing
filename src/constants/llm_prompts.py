@@ -30,6 +30,7 @@ Inputs:
 - avg_views: {avg_views}
 - avg_likes: {avg_likes}
 - momentum: {momentum}
+- avg_proxy_ctr_recency: {avg_proxy_ctr_recency}
 
 Rules:
 1. Use only the provided inputs.
@@ -44,19 +45,20 @@ Rules:
 10. Focus on the most dominant and repeated signals in the keywords, and ignore weak or isolated tokens.
 11. Prefer the simplest directly supported interpretation of the cluster.
 12. If the topic is not suitable for generic marketing, write a neutral summary, leave other fields empty, and set marketing_safe = false.
+13. Use avg_proxy_ctr_recency only as an engagement-intensity hint (high/medium/low); do not mention raw numbers.
 
 If suitable for marketing:
-13. Keep the summary to at most 2 sentences.
-14. Make the summary grounded, conservative, and cluster-level rather than title-level.
-15. suggested_subject must be 4 to 9 words, concise, and specific.
-16. campaign_angle must be practical and actionable.
-17. email_hook must be engaging but not generic.
-18. Avoid overusing celebrity names unless essential to the theme.
+14. Keep the summary to at most 2 sentences.
+15. Make the summary grounded, conservative, and cluster-level rather than title-level.
+16. suggested_subject must be 4 to 9 words, concise, and specific.
+17. campaign_angle must be practical and actionable.
+18. email_hook must be engaging but not generic.
+19. Avoid overusing celebrity names unless essential to the theme.
 
 Momentum:
-19. If momentum > 0.5, frame as emerging or fast-rising.
-20. If -0.2 <= momentum <= 0.5, frame as steady or active.
-21. If momentum < -0.2, frame as cooling but still engaged if views/likes are high.
+20. If momentum > 0.5, frame as emerging or fast-rising.
+21. If -0.2 <= momentum <= 0.5, frame as steady or active.
+22. If momentum < -0.2, frame as cooling but still engaged if views/likes are high.
 
 Output JSON only.
 """

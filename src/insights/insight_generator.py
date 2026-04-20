@@ -62,6 +62,7 @@ class InsightGenerator:
             avg_views=int(row["avg_views"]),
             avg_likes=int(row["avg_likes"]),
             momentum=f"{row['momentum']:.2f}",
+            avg_proxy_ctr_recency=f"{float(row.get('avg_proxy_ctr_recency', 0.0)):.4f}",
         )
 
         try:

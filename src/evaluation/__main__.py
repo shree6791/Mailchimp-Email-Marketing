@@ -1,6 +1,9 @@
 """
 CLI: load ``topic_insights.csv`` and print the same proxy NDCG as the pipeline log.
 
+Uses blended proxy gain:
+  0.5 * ctr_recency_norm + 0.3 * volume_norm + 0.2 * momentum_norm
+
   python -m src.evaluation [outputs/topic_insights.csv]
 """
 
@@ -25,7 +28,6 @@ def main() -> int:
         help="Path to topic_insights.csv",
     )
     parser.add_argument("--k", type=int, default=10, help="Top-K for NDCG (default 10)")
-    parser.add_argument("--gain-col", default="volume", help="Proxy gain column (default volume)")
     args = parser.parse_args()
 
     path = args.csv_path
@@ -36,10 +38,10 @@ def main() -> int:
     df = pd.read_csv(path)
     print(f"Loaded {len(df)} rows from {path.resolve()}\n")
 
-    nd = proxy_ndcg(df, gain_col=args.gain_col, score_col="trend_score", k=args.k)
-    print("Proxy NDCG (trend_score order vs ideal by gain column)")
-    print("  Interpretation: 1.0 = same ordering as sorting by gain; <1.0 = ranker reorders vs pure gain.")
-    for key in ("k", "gain_col", "score_col", "dcg@k (score order)", "idcg@k (ideal by gain)", "ndcg@k (proxy)"):
+    nd = proxy_ndcg(df, score_col="trend_score", k=args.k)
+    print("Proxy NDCG (trend_score order vs ideal by blended gain)")
+    print("  Interpretation: 1.0 = same ordering as sorting by blended gain; <1.0 = ranker reorders vs blended proxy.")
+    for key in ("k", "gain_formula", "score_col", "dcg@k (score order)", "idcg@k (ideal by gain)", "ndcg@k (proxy)"):
         if key in nd:
             print(f"  {key}: {nd[key]}")
 
