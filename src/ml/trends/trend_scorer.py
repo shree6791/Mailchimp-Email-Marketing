@@ -409,4 +409,9 @@ class TrendScorer:
         )
         topic_stats, latest_date = self._build_topic_stats(valid)
         topic_stats = self._apply_anchor_score(topic_stats)
-        return self._apply_lambdamart_score(topic_stats, valid, latest_date)
+        scored = self._apply_lambdamart_score(topic_stats, valid, latest_date)
+        if scored.empty:
+            return scored
+        ts = pd.Timestamp(latest_date)
+        scored["trending_snapshot_date"] = ts.strftime("%Y-%m-%d")
+        return scored

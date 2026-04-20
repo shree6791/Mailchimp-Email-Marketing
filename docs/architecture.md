@@ -23,7 +23,7 @@ Layers follow the dependency order of the implementation.
 | Presentation | `src/serving/streamlit/` | Streamlit UI and dashboard-specific transforms |
 | Contracts | `src/schemas/`, `src/constants/` | Row models, validators, prompts, thresholds, literals |
 
-Entry points: `main.py` runs the pipeline; `app.py` starts Streamlit. The same call sequence appears stepwise in `notebooks/trend_pipeline_walkthrough.ipynb`.
+Entry points: `main.py` runs the pipeline; `dashboard.py` starts Streamlit; [`app.py`](../app.py) (or `uvicorn app:app`) serves the FastAPI app, with routes in [`src/api/trends.py`](../src/api/trends.py) and [`src/api/campaigns.py`](../src/api/campaigns.py). The same call sequence appears stepwise in `notebooks/trend_pipeline_walkthrough.ipynb`.
 
 ### 3. End-to-end data flow
 
@@ -99,7 +99,9 @@ Execution order matches `TrendPipelineEngine` ([`src/pipeline/trend_engine.py`](
 
 Replay Step 7 metrics from CSV: `python -m src.evaluation outputs/topic_insights.csv`.
 
-Scoring (stage 6): after topics are discovered, rows are organized into date+segment groups so LambdaMART can compare similar items against each other. The model is trained on those grouped rows, then used to score the latest-date rows for dashboard output. The final `trend_score` blends the learned ranking signal with stable anchor signals (configured by `lambdamart_blend_alpha`).
+Scoring (stage 6): after topics are discovered, rows are organized into date+segment groups so LambdaMART can compare similar items against each other. The model is trained on those grouped rows, then used to score **only** rows from the **latest `trending_date`** in the input (inference `pred_df` is filtered to that day). The export repeats **`trending_snapshot_date`** on every row so downstream tools know the as-of day. Topics with no videos on that day do not appear in `topic_insights.csv`. The final `trend_score` blends the learned ranking signal with stable anchor signals (configured by `lambdamart_blend_alpha`).
+
+Optional **FastAPI** stub: [`app.py`](../app.py) exposes list/detail/post endpoints over `topic_insights.csv` for demos (`uvicorn app:app`); trend handlers live in [`src/api/trends.py`](../src/api/trends.py), campaign stub in [`src/api/campaigns.py`](../src/api/campaigns.py).
 
 Topic identifiers: `topic` integers are run-scoped, not stable across runs.
 
@@ -109,7 +111,7 @@ Topic identifiers: `topic` integers are run-scoped, not stable across runs.
 ```mermaid
 flowchart TB
   M[main.py] --> TE[TrendPipelineEngine]
-  A[app.py] --> UI[streamlit]
+  A[dashboard.py] --> UI[streamlit]
   TE --> PR[pipeline_run]
   PR --> W[storage.writers]
   TE --> DL[ingestion.loader]
@@ -134,7 +136,7 @@ flowchart TB
 | `data/raw/` | Region CSV (default `USvideos.csv`) | Raw Kaggle export after download. |
 | `data/processed/` | `videos_text_before_topics.csv` | Input metrics plus `document` and `cleaned_text` prior to topic assignment. |
 | `outputs/` | `videos_with_topics.csv` | Per-video metrics with `topic` and `topic_confidence`. |
-| `outputs/` | `topic_insights.csv` | One row per scored topic-segment entry: metrics, segment fields, keywords, LLM fields, nested `campaign_copy`. |
+| `outputs/` | `topic_insights.csv` | One row per scored topic-segment entry for the **latest trending day in the dataset**: metrics, `ranking_segment` / `segment_rank`, **`trending_snapshot_date`** (ISO date of that day), keywords, LLM fields, nested `campaign_copy`. |
 
 #### 6.2 Join semantics
 

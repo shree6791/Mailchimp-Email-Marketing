@@ -4,6 +4,8 @@ End-to-end **batch pipeline** plus a **Streamlit** dashboard. It loads public Yo
 
 This repo does **not** connect to Mailchimp or other ESP APIs; it writes local CSVs and serves a local UI.
 
+**`topic_insights.csv` rows** are a **snapshot for the latest `trending_date` present in the run** (the model scores topic×`ranking_segment` pairs that appear on that day). Row count follows the data, not a fixed cap. Each row includes **`trending_snapshot_date`** (`YYYY-MM-DD`) so exports and APIs know which day the scores target.
+
 | Resource | Purpose |
 |----------|---------|
 | [docs/architecture.md](docs/architecture.md) | Modules, data flow, artifacts, schemas |
@@ -47,6 +49,9 @@ python -m spacy download en_core_web_sm
 
 - **OpenAI:** create `.env` in the repo root with `OPENAI_API_KEY=<secret>` if you want LLM-generated insights.
 - **Pipeline:** edit [`src/config/settings.py`](src/config/settings.py) (`Settings`) for paths, row limits, models, LambdaMART knobs (`lambdamart_*`), `log_ranking_evaluation`, `llm_top_n`, etc.
+- **Dashboard data source:** by default [`dashboard.py`](dashboard.py) reads **`outputs/topic_insights.csv`** directly (simple local demo). For a **production-style** setup, run the Trend API and point the UI at it:
+  - `export TREND_API_BASE_URL=http://127.0.0.1:8000` (then `streamlit run dashboard.py`). The dashboard loads full rows from `GET /topic-insights/records` on that server. Unset the variable to use the CSV again.
+  - Do **not** name the Streamlit file `streamlit.py` — it would shadow the Streamlit package.
 
 ### Run
 
@@ -58,11 +63,27 @@ python main.py
 
 Writes under `data/processed/` and `outputs/` and prints a short summary.
 
-**Dashboard** (after `outputs/topic_insights.csv` exists):
+**Dashboard** (after `outputs/topic_insights.csv` exists, or API is up):
 
 ```bash
-streamlit run app.py
+streamlit run dashboard.py
 ```
+
+**HTTP API** ([`app.py`](app.py) mounts [`src/api/trends.py`](src/api/trends.py) and [`src/api/campaigns.py`](src/api/campaigns.py); reads `topic_insights.csv` from `Settings.output_dir`):
+
+```bash
+python app.py
+```
+
+Same as: `uvicorn app:app --reload --host 127.0.0.1 --port 8000` from repo root with `PYTHONPATH` set to the repo (or run from the repo root so `app` resolves).
+
+- `GET /health` — liveness
+- `GET /topic-insights/records` — full table JSON for the Streamlit dashboard (when `TREND_API_BASE_URL` is set)
+- `GET /trends?limit=&offset=` — slim list (`trend_id` is `topic:ranking_segment`)
+- `GET /trends/{trend_id}` — detail
+- `POST /campaigns/{campaign_id}/trends` — body `{"trend_id":"..."}` (in-memory stub, no DB)
+
+More detail: [`docs/api.md`](docs/api.md).
 
 ### Data source
 

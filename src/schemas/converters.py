@@ -77,7 +77,27 @@ def _topic_insight_from_series(row: pd.Series) -> TopicInsightRow:
         d["topic"] = int(d["topic"])
     if d.get("volume") is not None:
         d["volume"] = int(d["volume"])
+    rs = d.get("ranking_segment")
+    if rs is None or (isinstance(rs, float) and pd.isna(rs)):
+        d["ranking_segment"] = "general"
+    else:
+        d["ranking_segment"] = str(rs).strip() or "general"
+    sr = d.get("segment_rank")
+    if sr is None or (isinstance(sr, float) and pd.isna(sr)):
+        d["segment_rank"] = 0
+    else:
+        d["segment_rank"] = int(float(sr))
+    td = d.get("trending_snapshot_date")
+    if td is None or (isinstance(td, float) and pd.isna(td)):
+        d["trending_snapshot_date"] = ""
+    else:
+        d["trending_snapshot_date"] = str(td).strip()
     return TopicInsightRow.model_validate(d)
+
+
+def topic_insight_row_from_series(row: pd.Series) -> TopicInsightRow:
+    """Build a validated ``TopicInsightRow`` from a ``topic_insights.csv`` row."""
+    return _topic_insight_from_series(row)
 
 
 def validate_trending_video_rows(df: pd.DataFrame, *, sample: int | None = None) -> None:

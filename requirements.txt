@@ -13,3 +13,7 @@ python-dotenv
 streamlit
 pydantic>=2.7
 jupyter
+fastapi
+uvicorn[standard]
+httpx
+pytest

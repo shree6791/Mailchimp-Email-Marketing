@@ -1,6 +1,6 @@
 ## Machine learning pipeline — worked example (non-technical)
 
-This document explains how the batch pipeline turns tabular trending-video rows into topic-segment ranking rows and AI-written marketing text (summary + email copy), using one small illustrative example. Numbers are representative; production runs depend on the full file and configuration. Implementation detail, paths, and diagrams are in [architecture.md](architecture.md).
+This document explains how the batch pipeline turns tabular trending-video rows into topic-segment ranking rows and AI-written marketing text (summary + email copy), using one small illustrative example. Numbers are representative; production runs depend on the full file and configuration. **Scored rows in `topic_insights.csv` target the latest trending day in the data** (see `trending_snapshot_date` on each export row). Implementation detail, paths, and diagrams are in [architecture.md](architecture.md).
 
 ---
 

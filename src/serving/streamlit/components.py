@@ -186,7 +186,7 @@ def render_trend_card(row: pd.Series) -> None:
 
 def render_top_metrics(topic_insights: pd.DataFrame, filtered: pd.DataFrame) -> None:
     """Dataset-level counts only; card count is controlled by sidebar (avoid misleading KPIs)."""
-    _ = filtered  # kept for call-site stability with app.py
+    _ = filtered  # kept for call-site stability with dashboard.py
     a, b = st.columns(2)
     a.metric("Topics identified", len(topic_insights))
     b.metric("Mixed / noisy topics", int((topic_insights["fragmented_trend"] == True).sum()))

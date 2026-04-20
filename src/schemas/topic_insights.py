@@ -29,6 +29,9 @@ class TopicInsightRow(BaseModel):
     avg_proxy_ctr_recency: float = 0.0
     trend_score: float = 0.0
 
+    ranking_segment: str = "general"
+    segment_rank: int = 0
+
     topic_keywords: list[str] = Field(default_factory=list)
     dominant_topic_keywords: list[str] = Field(default_factory=list)
     topic_label: str = ""
@@ -36,6 +39,7 @@ class TopicInsightRow(BaseModel):
     trend_type: str = "general"
     fragmented_trend: bool = False
     topic_display_name: str = ""
+    trending_snapshot_date: str = ""
     summary: str = ""
     marketing_safe: bool | None = None
     campaign_copy: EmailCampaignCopy = Field(default_factory=EmailCampaignCopy)
