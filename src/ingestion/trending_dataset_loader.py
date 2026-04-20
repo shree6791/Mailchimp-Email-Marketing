@@ -40,8 +40,10 @@ class TrendingDatasetLoader:
             "tags",
             "views",
             "likes",
+            "dislikes",
             "comment_count",
             "trending_date",
+            "publish_time",
         ]
         missing = [col for col in required_columns if col not in df.columns]
         if missing:

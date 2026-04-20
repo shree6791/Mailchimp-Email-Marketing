@@ -14,6 +14,8 @@ class TrendingVideoRow(BaseModel):
     tags: str = ""
     views: float = 0.0
     likes: float = 0.0
+    dislikes: float = 0.0
     comment_count: float = 0.0
     trending_date: str = ""
+    publish_time: str = ""
     description: str | None = None
