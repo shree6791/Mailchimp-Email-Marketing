@@ -45,7 +45,7 @@ python -m spacy download en_core_web_sm
 ### Configuration
 
 - **OpenAI:** create `.env` in the repo root with `OPENAI_API_KEY=<secret>` if you want LLM-generated insights.
-- **Pipeline:** edit [`src/config/settings.py`](src/config/settings.py) (`Settings`) for paths, row limits, models, LambdaMART knobs (`lambdamart_*`), `log_ranking_evaluation`, `llm_top_n`, etc.
+- **Pipeline:** edit [`src/config/settings.py`](src/config/settings.py) (`Settings`) for paths, `recent_trending_days` (default 7 days of `trending_date`), `max_rows`, `recency_half_life_hours`, models, LambdaMART knobs (`lambdamart_*`), `log_ranking_evaluation`, `llm_top_n`, etc.
 - **Dashboard:** default is local **`outputs/topic_insights.csv`**. Optional: `export TREND_API_BASE_URL=http://127.0.0.1:8000` before `streamlit run dashboard.py` to load via the API ([`docs/api.md`](docs/api.md)). Do **not** name the entry file `streamlit.py` (shadows the library).
 
 ### Run

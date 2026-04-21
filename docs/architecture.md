@@ -137,6 +137,8 @@ flowchart TB
 
 `main.py` writes checkpoints under **`data/processed/`** and finals under **`outputs/`** (paths configurable via `Settings`). Downloaded input lands in **`data/raw/`** first.
 
+**Ingestion window:** [`TrendingDatasetLoader`](../src/ingestion/trending_dataset_loader.py) can restrict to the last **`Settings.recent_trending_days`** calendar days of `trending_date` (anchored at the newest date in the CSV), sort by `trending_date` descending, then apply **`max_rows`** before validation—so the batch run matches a short “recent trends” slice for demos.
+
 #### 6.1 Files produced
 
 | Directory | File name | Contents (summary) |

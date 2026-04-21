@@ -11,6 +11,11 @@ class Settings:
     output_dir: str = "outputs"
 
     max_rows: int = 5000
+    # Keep rows whose trending_date falls in the last N calendar days (relative to max date in CSV).
+    # None disables the filter (use full history). Demo default aligns with a ~1-week trending window.
+    recent_trending_days: int | None = 7
+    # Hours in exp(-age_hours / half_life) for proxy CTR×recency; tune with recent_trending_days if needed.
+    recency_half_life_hours: float = 96.0
     use_description: bool = False
 
     spacy_model_name: str = "en_core_web_sm"

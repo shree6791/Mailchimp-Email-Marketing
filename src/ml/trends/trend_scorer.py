@@ -1,4 +1,3 @@
-import re
 from typing import Mapping
 
 from lightgbm import LGBMRanker
@@ -8,6 +7,7 @@ import pandas as pd
 from src.config.settings import Settings
 from src.ml.trends.trend_taxonomy import classify_trend_type
 from src.utils.text_utils import safe_text
+from src.utils.trending_dates import parse_trending_date_series
 
 
 class TrendScorer:
@@ -22,13 +22,9 @@ class TrendScorer:
 
     @staticmethod
     def parse_trending_date(series: pd.Series) -> pd.Series:
-        sample = safe_text(series.iloc[0]) if len(series) else ""
-        if re.match(r"^\d{2}\.\d{2}\.\d{2}$", sample):
-            return pd.to_datetime(series, format="%y.%d.%m", errors="coerce")
-        return pd.to_datetime(series, errors="coerce")
+        return parse_trending_date_series(series)
 
-    @staticmethod
-    def _build_video_level_features(valid: pd.DataFrame) -> pd.DataFrame:
+    def _build_video_level_features(self, valid: pd.DataFrame) -> pd.DataFrame:
         """Create robust per-video ranking features from available engagement fields."""
         out = valid.copy()
         out["views_safe"] = out["views"].clip(lower=1)
@@ -64,7 +60,8 @@ class TrendScorer:
         out["age_hours"] = age_hours.clip(lower=0).fillna(72.0)
 
         # Higher weight for fresher videos while keeping older content relevant.
-        out["recency_weight"] = np.exp(-out["age_hours"] / 96.0).clip(lower=0.2, upper=1.0)
+        half_life = max(float(self.settings.recency_half_life_hours), 1e-6)
+        out["recency_weight"] = np.exp(-out["age_hours"] / half_life).clip(lower=0.2, upper=1.0)
         out["proxy_ctr_recency"] = (out["proxy_ctr"] * out["recency_weight"]).clip(0.0, 1.0)
         return out
 
