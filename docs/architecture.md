@@ -139,7 +139,7 @@ flowchart TB
 
 **Ingestion window:** [`TrendingDatasetLoader`](../src/ingestion/trending_dataset_loader.py) can restrict to the last **`Settings.recent_trending_days`** calendar days of `trending_date` (anchored at the newest date in the CSV), sort by `trending_date` descending, then apply **`max_rows`** before validation—so the batch run matches a short “recent trends” slice for demos.
 
-#### 6.1 Files produced
+#### Files produced
 
 | Directory | File name | Contents (summary) |
 |-----------|-----------|----------------------|
@@ -148,11 +148,11 @@ flowchart TB
 | `outputs/` | `videos_with_topics.csv` | Per-video metrics with `topic` and `topic_confidence`. |
 | `outputs/` | `topic_insights.csv` | One row per scored topic-segment entry for the **latest trending day in the dataset**: metrics, `ranking_segment` / `segment_rank`, **`trending_snapshot_date`** (ISO date of that day), keywords, LLM fields, nested `campaign_copy`. |
 
-#### 6.2 Join semantics
+#### Join semantics
 
-Within one pipeline run and working directory, `videos_with_topics.topic` maps to one or more `topic_insights` rows via (`topic`, `ranking_segment`) pairs for the same logical cluster.
+Within one pipeline run and working directory, a `videos_with_topics.topic` value can match several `topic_insights` rows that share the same topic id but differ by `ranking_segment` (one export row per topic–segment).
 
-#### 6.3 Validation and versioning
+#### Validation and versioning
 
 | Concern | Location |
 |---------|----------|
